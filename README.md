@@ -8,7 +8,7 @@ WLAM consolidates account creation, password management, enable/disable, Adminis
 
 ## Screenshot
 
-[TUI screenshot](screenshots/tui.png)
+![TUI screenshot](screenshots/tui.png)
 
 ---
 
