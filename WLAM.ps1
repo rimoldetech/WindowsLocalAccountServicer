@@ -85,7 +85,7 @@
     Requires local Administrator privileges.
     Designed for use with TacticalRMM and similar RMM platforms.
     Lock screen hide/show changes require a system restart to take effect.
-    Version 1.0
+    Version 1.0.1
 #>
 
 param (
@@ -109,6 +109,9 @@ param (
 $ErrorActionPreference = 'Stop'
 
 #region -- Constants -----------------------------------------------------------
+
+# Update this value when cutting a new release
+$Script:Version = '1.0.1'
 
 $RegKeyPath = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\SpecialAccounts\UserList'
 $AdminSID   = 'S-1-5-32-544'   # Builtin\Administrators
@@ -396,7 +399,7 @@ function Write-TuiBanner {
     Clear-Host
     Write-Host ''
     Write-Host '  +-------------------------------------------+' -ForegroundColor Cyan
-    Write-Host '  |      Local User Account Manager           |' -ForegroundColor Cyan
+    Write-Host ('  |    WLAM v{0} - Local Account Manager    |' -f $Script:Version) -ForegroundColor Cyan
     Write-Host '  +-------------------------------------------+' -ForegroundColor Cyan
     Write-Host ''
 }
@@ -642,6 +645,8 @@ if (-not $Action) {
     Invoke-TUI
     exit 0
 }
+
+Write-Info "WLAM v$($Script:Version)"
 
 # Non-interactive: ensure a username is present for every action that needs one
 $actionsNeedingUser = $Action | Where-Object { $_ -ne 'List' }
