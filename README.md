@@ -54,13 +54,16 @@ Run WLAM with no arguments to launch the menu interface.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `-Username` | string | For most actions | Target local account name. Not required for `List`. |
+| `-Username` | string | For most actions | Target local account name. Not required for `List`. When passed alone without `-Action`, displays account information. |
 | `-Action` | string[] | Yes | One or more actions to perform (see below). Comma-separated or passed multiple times. |
 | `-Password` | string | No | Plaintext password for `Create` or `ResetPassword`. Auto-generated if omitted. |
 | `-PasswordLength` | int | No | Length of the auto-generated password. Default: `20`. |
 | `-FullName` | string | No | Display name for the account. Used with `Create` and `SetInfo`. |
 | `-Description` | string | No | Account description. Used with `Create` and `SetInfo`. |
 | `-Admin` | switch | No | When used with `Create`, adds the account to the Administrators group. |
+| `-NoPassword` | switch | No | When used with `Create`, creates the account with no password. When used with `ResetPassword`, removes the existing password. |
+| `-ClearFullName` | switch | No | When used with `SetInfo`, clears the full name field to blank. |
+| `-ClearDescription` | switch | No | When used with `SetInfo`, clears the description field to blank. |
 
 ---
 
@@ -73,12 +76,12 @@ Run WLAM with no arguments to launch the menu interface.
 | `Delete` | Delete an account. Also removes any associated lock screen registry entry. |
 | `Enable` | Enable a disabled account. |
 | `Disable` | Disable an account. |
-| `ResetPassword` | Reset the account password. Generates a random password if `-Password` is not provided. |
-| `SetInfo` | Update the full name and/or description of an existing account. |
+| `ResetPassword` | Reset the account password. Generates a random password if `-Password` is not provided. Use `-NoPassword` to remove the password entirely. |
+| `SetInfo` | Update the full name and/or description of an existing account. Use `-ClearFullName` or `-ClearDescription` to blank those fields. |
 | `Promote` | Add the account to the Administrators group. |
-| `Demote` | Remove the account from the Administrators group. |
-| `Hide` | Hide the account from the Windows lock screen. Takes effect after a restart. |
-| `Show` | Show the account on the Windows lock screen. Takes effect after a restart. |
+| `Demote` | Remove the account from the Administrators group. Ensures the account remains in the Users group. |
+| `Hide` | Hide the account from the Windows lock screen. A sign-out or restart may be required. |
+| `Show` | Show the account on the Windows lock screen. A sign-out or restart may be required. |
 
 When multiple actions are specified, they always execute in this order regardless of how they are passed: `Create → Enable/Disable → ResetPassword → SetInfo → Promote/Demote → Hide/Show → Delete → List`
 
@@ -91,6 +94,11 @@ When multiple actions are specified, they always execute in this order regardles
 .\WLAM.ps1 -Action List
 ```
 
+**Show information for a specific account**
+```powershell
+.\WLAM.ps1 -Username jdoe
+```
+
 **Create a standard user with a random password**
 ```powershell
 .\WLAM.ps1 -Username jdoe -Action Create -FullName "John Doe"
@@ -99,6 +107,11 @@ When multiple actions are specified, they always execute in this order regardles
 **Create an admin account with a specific password**
 ```powershell
 .\WLAM.ps1 -Username svcadmin -Action Create -Password "P@ssw0rd!" -Admin
+```
+
+**Create an account with no password**
+```powershell
+.\WLAM.ps1 -Username jdoe -Action Create -NoPassword
 ```
 
 **Create an admin account, hide from lock screen, and enable in one run**
@@ -111,6 +124,11 @@ When multiple actions are specified, they always execute in this order regardles
 .\WLAM.ps1 -Username jdoe -Action ResetPassword,Hide
 ```
 
+**Remove a user's password**
+```powershell
+.\WLAM.ps1 -Username jdoe -Action ResetPassword -NoPassword
+```
+
 **Promote an existing account and enable it**
 ```powershell
 .\WLAM.ps1 -Username jdoe -Action Promote,Enable
@@ -119,6 +137,16 @@ When multiple actions are specified, they always execute in this order regardles
 **Update full name and description**
 ```powershell
 .\WLAM.ps1 -Username jdoe -Action SetInfo -FullName "John Doe" -Description "Finance dept"
+```
+
+**Clear a user's full name and set a new description**
+```powershell
+.\WLAM.ps1 -Username jdoe -Action SetInfo -ClearFullName -Description "Finance dept"
+```
+
+**Clear both full name and description**
+```powershell
+.\WLAM.ps1 -Username jdoe -Action SetInfo -ClearFullName -ClearDescription
 ```
 
 **Disable an account**
@@ -146,8 +174,10 @@ This script is designed to work cleanly within TacticalRMM:
 
 ## Notes
 
-- Lock screen `Hide`/`Show` changes require a **system restart** to take effect
+- Lock screen `Hide`/`Show` changes may require a sign-out or restart to take effect, depending on the environment
+- `Demote` always ensures the account remains in the Users group after removal from Administrators, consistent with Windows built-in behaviour
 - Deleting an account automatically removes its lock screen registry entry if one exists, preventing it from being silently inherited by a future account with the same username
+- Passing `-Username` without `-Action` displays a summary of that account rather than launching the TUI, making it safe to use in RMM contexts
 - The random password generator uses `RNGCryptoServiceProvider` and guarantees at least one lowercase letter, uppercase letter, digit, and special character in every generated password
 
 ---
