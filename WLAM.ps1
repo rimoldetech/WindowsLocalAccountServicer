@@ -24,8 +24,10 @@
         ResetPassword   Reset a user's password
         Promote         Add user to the Administrators group
         Demote          Remove user from the Administrators group
-        Hide            Hide user from the Windows lock screen (requires restart)
-        Show            Show user on the Windows lock screen (requires restart)
+        Hide            Hide user from the Windows lock screen
+                        (a sign-out or restart may be required)
+        Show            Show user on the Windows lock screen
+                        (a sign-out or restart may be required)
         SetInfo         Update the full name and/or description of an existing account
 
 .PARAMETER Password
@@ -44,6 +46,16 @@
 .PARAMETER Admin
     Switch. When used with Create, places the new user in the Administrators group.
     Equivalent to running Create followed by Promote.
+
+.PARAMETER NoPassword
+    Switch. When used with Create, the account is created with no password.
+    When used with ResetPassword, removes the existing password.
+
+.PARAMETER ClearFullName
+    Switch. When used with SetInfo, clears the full name field to blank.
+
+.PARAMETER ClearDescription
+    Switch. When used with SetInfo, clears the description field to blank.
 
 .EXAMPLE
     # Launch the interactive TUI (no arguments)
@@ -78,13 +90,25 @@
     .\WLAM.ps1 -Username jdoe -Action ResetPassword -Password "NewP@ss1"
 
 .EXAMPLE
+    # Create an account with no password
+    .\WLAM.ps1 -Username jdoe -Action Create -NoPassword
+
+.EXAMPLE
+    # Remove a user's password
+    .\WLAM.ps1 -Username jdoe -Action ResetPassword -NoPassword
+
+.EXAMPLE
+    # Clear a user's full name and set a new description
+    .\WLAM.ps1 -Username jdoe -Action SetInfo -ClearFullName -Description "Finance dept"
+
+.EXAMPLE
     # Delete an account
     .\WLAM.ps1 -Username olduser -Action Delete
 
 .NOTES
     Requires local Administrator privileges.
     Designed for use with TacticalRMM and similar RMM platforms.
-    Lock screen hide/show changes require a system restart to take effect.
+    Lock screen hide/show changes may require a sign-out or restart to take effect.
     Version 1.0.1
 #>
 
@@ -103,7 +127,13 @@ param (
 
     [string]$Description = '',
 
-    [switch]$Admin
+    [switch]$Admin,
+
+    [switch]$NoPassword,
+
+    [switch]$ClearFullName,
+
+    [switch]$ClearDescription
 )
 
 $ErrorActionPreference = 'Stop'
@@ -232,15 +262,24 @@ function Invoke-CreateUser {
         [string]$PlainPassword,
         [string]$UserFullName,
         [string]$UserDescription,
-        [bool]$MakeAdmin
+        [bool]$MakeAdmin,
+        [bool]$NoPassword
     )
     Assert-UserNotExists -Name $Name
-    $securePass = ConvertTo-SecureStringLocal -Plaintext $PlainPassword
-    New-LocalUser -Name $Name `
-                  -Password $securePass `
-                  -FullName $UserFullName `
-                  -Description $UserDescription `
-                  -PasswordNeverExpires | Out-Null
+    if ($NoPassword) {
+        New-LocalUser -Name $Name `
+                      -NoPassword `
+                      -FullName $UserFullName `
+                      -Description $UserDescription | Out-Null
+    }
+    else {
+        $securePass = ConvertTo-SecureStringLocal -Plaintext $PlainPassword
+        New-LocalUser -Name $Name `
+                      -Password $securePass `
+                      -FullName $UserFullName `
+                      -Description $UserDescription `
+                      -PasswordNeverExpires | Out-Null
+    }
     if ($MakeAdmin) {
         Add-LocalGroupMember -SID $AdminSID -Member $Name
         Write-Ok "Created user '$Name' and added to Administrators."
@@ -249,7 +288,8 @@ function Invoke-CreateUser {
         Add-LocalGroupMember -SID $UsersSID -Member $Name
         Write-Ok "Created user '$Name' and added to Users."
     }
-    Write-Info "Password: $PlainPassword"
+    if ($NoPassword) { Write-Info 'No password set.' }
+    else             { Write-Info "Password: $PlainPassword" }
 }
 
 function Invoke-DeleteUser ([string]$Name) {
@@ -277,30 +317,60 @@ function Invoke-DisableUser ([string]$Name) {
     Write-Ok "Disabled account '$Name'."
 }
 
-function Invoke-ResetPassword ([string]$Name, [string]$PlainPassword) {
+function Invoke-ResetPassword ([string]$Name, [string]$PlainPassword, [bool]$NoPassword) {
     $user = Assert-UserExists -Name $Name
-    $user | Set-LocalUser -Password (ConvertTo-SecureStringLocal -Plaintext $PlainPassword)
-    Write-Ok "Password reset for '$Name'."
-    Write-Info "New password: $PlainPassword"
+    if ($NoPassword) {
+        $user | Set-LocalUser -Password (New-Object System.Security.SecureString)
+        Write-Ok "Password removed for '$Name'."
+    }
+    else {
+        $user | Set-LocalUser -Password (ConvertTo-SecureStringLocal -Plaintext $PlainPassword)
+        Write-Ok "Password reset for '$Name'."
+        Write-Info "New password: $PlainPassword"
+    }
 }
 
 function Invoke-SetUserInfo {
     param (
         [string]$Name,
         [string]$UserFullName,
-        [string]$UserDescription
+        [string]$UserDescription,
+        [bool]$ClearFullName,
+        [bool]$ClearDescription
     )
     Assert-UserExists -Name $Name | Out-Null
-    if ([string]::IsNullOrEmpty($UserFullName) -and [string]::IsNullOrEmpty($UserDescription)) {
-        Write-Warn "SetInfo requires at least one of -FullName or -Description to be provided."
+
+    $params = @{}
+
+    if ($ClearFullName) {
+        $params['FullName'] = ''
+    }
+    elseif (-not [string]::IsNullOrEmpty($UserFullName)) {
+        $params['FullName'] = $UserFullName
+    }
+
+    if ($ClearDescription) {
+        $params['Description'] = ''
+    }
+    elseif (-not [string]::IsNullOrEmpty($UserDescription)) {
+        $params['Description'] = $UserDescription
+    }
+
+    if ($params.Count -eq 0) {
+        Write-Warn "SetInfo requires at least one of -FullName, -Description, -ClearFullName, or -ClearDescription."
         return
     }
-    $params = @{}
-    if (-not [string]::IsNullOrEmpty($UserFullName))    { $params['FullName']    = $UserFullName }
-    if (-not [string]::IsNullOrEmpty($UserDescription)) { $params['Description'] = $UserDescription }
+
     Set-LocalUser -Name $Name @params
-    if ($params.ContainsKey('FullName'))    { Write-Ok "Full name updated for '$Name': $UserFullName" }
-    if ($params.ContainsKey('Description')) { Write-Ok "Description updated for '$Name': $UserDescription" }
+
+    if ($params.ContainsKey('FullName')) {
+        if ($ClearFullName) { Write-Ok "Full name cleared for '$Name'." }
+        else                { Write-Ok "Full name updated for '$Name': $UserFullName" }
+    }
+    if ($params.ContainsKey('Description')) {
+        if ($ClearDescription) { Write-Ok "Description cleared for '$Name'." }
+        else                   { Write-Ok "Description updated for '$Name': $UserDescription" }
+    }
 }
 
 function Invoke-PromoteUser ([string]$Name) {
@@ -321,6 +391,10 @@ function Invoke-DemoteUser ([string]$Name) {
     }
     Remove-LocalGroupMember -SID $AdminSID -Member $Name
     Write-Ok "Demoted '$Name' from Administrator."
+    if (-not (Test-IsInGroup -Name $Name -GroupSID $UsersSID)) {
+        Add-LocalGroupMember -SID $UsersSID -Member $Name
+        Write-Info "Added '$Name' to Users group."
+    }
 }
 
 function Invoke-HideUser ([string]$Name) {
@@ -330,7 +404,7 @@ function Invoke-HideUser ([string]$Name) {
     }
     New-ItemProperty -LiteralPath $RegKeyPath -Name $Name -Value 0 `
                      -PropertyType DWord -Force | Out-Null
-    Write-Ok "User '$Name' will be hidden on the lock screen. A restart is required."
+    Write-Ok "User '$Name' will be hidden on the lock screen. A sign-out or restart may be required."
 }
 
 function Invoke-ShowUser ([string]$Name) {
@@ -340,7 +414,7 @@ function Invoke-ShowUser ([string]$Name) {
         if ($prop) {
             New-ItemProperty -LiteralPath $RegKeyPath -Name $Name -Value 1 `
                              -PropertyType DWord -Force | Out-Null
-            Write-Ok "User '$Name' will be shown on the lock screen. A restart is required."
+            Write-Ok "User '$Name' will be shown on the lock screen. A sign-out or restart may be required."
             return
         }
     }
@@ -351,6 +425,22 @@ function Invoke-ShowUser ([string]$Name) {
 
 #region -- Non-Interactive Dispatcher ------------------------------------------
 
+function Show-UserInfo ([string]$Name) {
+    $user    = Assert-UserExists -Name $Name
+    $isAdmin = Test-IsAdmin -Name $Name
+    $isHidden = $false
+    if (Test-Path -LiteralPath $RegKeyPath) {
+        $prop = Get-ItemProperty -LiteralPath $RegKeyPath -Name $Name -ErrorAction SilentlyContinue
+        if ($prop -and $prop.$Name -eq 0) { $isHidden = $true }
+    }
+    Write-Info "Account information for '$Name':"
+    Write-Output "  Enabled     : $(if ($user.Enabled) {'Yes'} else {'No'})"
+    Write-Output "  Admin       : $(if ($isAdmin)      {'Yes'} else {'No'})"
+    Write-Output "  Hidden      : $(if ($isHidden)     {'Yes'} else {'No'})"
+    Write-Output "  Full Name   : $(if ($user.FullName)    {$user.FullName}    else {'(none)'})"
+    Write-Output "  Description : $(if ($user.Description) {$user.Description} else {'(none)'})"
+}
+
 function Invoke-Actions {
     param (
         [string[]]$Actions,
@@ -359,16 +449,19 @@ function Invoke-Actions {
         [int]$PwLength,
         [string]$UserFullName,
         [string]$UserDescription,
-        [bool]$MakeAdmin
+        [bool]$MakeAdmin,
+        [bool]$NoPassword,
+        [bool]$ClearFullName,
+        [bool]$ClearDescription
     )
 
     # Sort into a safe logical execution order regardless of what the caller supplied
     $ordered = $ActionOrder | Where-Object { $_ -in $Actions }
 
-    # Generate a password once if any action needs one and none was supplied
+    # Generate a password only if needed and not explicitly suppressed by -NoPassword
     $pwActions = @('Create', 'ResetPassword')
     $needsPw   = $ordered | Where-Object { $_ -in $pwActions }
-    if ($needsPw -and [string]::IsNullOrEmpty($PlainPassword)) {
+    if ($needsPw -and -not $NoPassword -and [string]::IsNullOrEmpty($PlainPassword)) {
         $PlainPassword = New-RandomPassword -Length $PwLength
         Write-Info "No password provided -- generated a random $PwLength-character password."
     }
@@ -377,12 +470,12 @@ function Invoke-Actions {
         Write-Info "--- Action: $a ---"
         switch ($a) {
             'List'          { Invoke-ListUsers }
-            'Create'        { Invoke-CreateUser -Name $Name -PlainPassword $PlainPassword -UserFullName $UserFullName -UserDescription $UserDescription -MakeAdmin $MakeAdmin }
+            'Create'        { Invoke-CreateUser -Name $Name -PlainPassword $PlainPassword -UserFullName $UserFullName -UserDescription $UserDescription -MakeAdmin $MakeAdmin -NoPassword $NoPassword }
             'Delete'        { Invoke-DeleteUser -Name $Name }
             'Enable'        { Invoke-EnableUser -Name $Name }
             'Disable'       { Invoke-DisableUser -Name $Name }
-            'ResetPassword' { Invoke-ResetPassword -Name $Name -PlainPassword $PlainPassword }
-            'SetInfo'       { Invoke-SetUserInfo -Name $Name -UserFullName $UserFullName -UserDescription $UserDescription }
+            'ResetPassword' { Invoke-ResetPassword -Name $Name -PlainPassword $PlainPassword -NoPassword $NoPassword }
+            'SetInfo'       { Invoke-SetUserInfo -Name $Name -UserFullName $UserFullName -UserDescription $UserDescription -ClearFullName $ClearFullName -ClearDescription $ClearDescription }
             'Promote'       { Invoke-PromoteUser -Name $Name }
             'Demote'        { Invoke-DemoteUser -Name $Name }
             'Hide'          { Invoke-HideUser -Name $Name }
@@ -434,13 +527,12 @@ function Read-TuiExistingUser {
 }
 
 function Read-TuiPassword ([string]$Context = 'Password') {
-    Write-Host "  $Context`:  [1] Generate random   [2] Enter manually"
-    $c = Read-TuiChoice -Prompt 'Choice' -Valid @('1', '2')
-    if ($c -eq '1') {
-        return New-RandomPassword -Length 20
-    }
-    else {
-        return Read-TuiNonEmpty -Prompt 'Password'
+    Write-Host "  $Context`:  [1] Generate random   [2] Enter manually   [3] No password"
+    $c = Read-TuiChoice -Prompt 'Choice' -Valid @('1', '2', '3')
+    switch ($c) {
+        '1' { return New-RandomPassword -Length 20 }
+        '2' { return Read-TuiNonEmpty -Prompt 'Password' }
+        '3' { return $null }
     }
 }
 
@@ -497,17 +589,19 @@ function Invoke-TuiCreateUser {
     Write-Host '  Account type:  [1] Standard User   [2] Administrator'
     $makeAdmin = (Read-TuiChoice -Prompt 'Choice' -Valid @('1', '2')) -eq '2'
 
-    $pw = Read-TuiPassword -Context 'Password'
+    $pw        = Read-TuiPassword -Context 'Password'
+    $noPw      = ($null -eq $pw)
 
     try {
         Invoke-CreateUser -Name $name `
-                          -PlainPassword $pw `
+                          -PlainPassword $(if ($noPw) { '' } else { $pw }) `
                           -UserFullName $fullName `
                           -UserDescription $desc `
-                          -MakeAdmin $makeAdmin
+                          -MakeAdmin $makeAdmin `
+                          -NoPassword $noPw
         Write-Host ''
-        Write-Host "  [OK] Created : $name"     -ForegroundColor Green
-        Write-Host "       Password: $pw"        -ForegroundColor Green
+        Write-Host "  [OK] Created : $name" -ForegroundColor Green
+        Write-Host "       Password: $(if ($noPw) {'(none)'} else {$pw})" -ForegroundColor Green
         Write-Host "       Admin   : $(if ($makeAdmin) {'Yes'} else {'No'})" -ForegroundColor Green
     }
     catch {
@@ -545,7 +639,7 @@ function Invoke-TuiManageUser {
 
         Write-Host "  Enabled : $(if ($isEnabled) {'Yes'} else {'No'})"
         Write-Host "  Admin   : $(if ($isAdmin)   {'Yes'} else {'No'})"
-        Write-Host "  Hidden  : $(if ($isHidden)  {'Yes (restart required)'} else {'No'})"
+        Write-Host "  Hidden  : $(if ($isHidden)  {'Yes (sign-out or restart may be required)'} else {'No'})"
         Write-Host ''
         Write-Host '    [1] Reset Password'
         Write-Host '    [2] Enable Account'
@@ -565,16 +659,18 @@ function Invoke-TuiManageUser {
         try {
             switch ($choice) {
                 '1' {
-                    $pw = Read-TuiPassword -Context 'New Password'
-                    Invoke-ResetPassword -Name $name -PlainPassword $pw
-                    Write-Host "  New password: $pw" -ForegroundColor Green
+                    $pw   = Read-TuiPassword -Context 'New Password'
+                    $noPw = ($null -eq $pw)
+                    Invoke-ResetPassword -Name $name -PlainPassword $(if ($noPw) {''} else {$pw}) -NoPassword $noPw
+                    if ($noPw) { Write-Host '  Password removed.' -ForegroundColor Green }
+                    else       { Write-Host "  New password: $pw" -ForegroundColor Green }
                 }
                 '2' { Invoke-EnableUser  -Name $name; Invoke-TuiResult 'Account enabled.' }
                 '3' { Invoke-DisableUser -Name $name; Invoke-TuiResult 'Account disabled.' }
                 '4' { Invoke-PromoteUser -Name $name; Invoke-TuiResult 'Promoted to Administrator.' }
                 '5' { Invoke-DemoteUser  -Name $name; Invoke-TuiResult 'Demoted from Administrator.' }
-                '6' { Invoke-HideUser    -Name $name; Invoke-TuiResult 'User will be hidden after restart.' }
-                '7' { Invoke-ShowUser    -Name $name; Invoke-TuiResult 'User will be shown after restart.' }
+                '6' { Invoke-HideUser    -Name $name; Invoke-TuiResult 'Hidden. A sign-out or restart may be required.' }
+                '7' { Invoke-ShowUser    -Name $name; Invoke-TuiResult 'Shown. A sign-out or restart may be required.' }
                 '8' {
                     $confirm = (Read-Host "  Type 'yes' to confirm deletion of '$name'").Trim()
                     if ($confirm -eq 'yes') {
@@ -589,12 +685,25 @@ function Invoke-TuiManageUser {
                 }
                 '9' {
                     $currentUser = Get-LocalUserSafe -Name $name
-                    Write-Host "  Current full name  : $($currentUser.FullName)"
-                    Write-Host "  Current description: $($currentUser.Description)"
-                    Write-Host ''
-                    $newFullName = (Read-Host '  New full name (Enter to keep current)').Trim()
-                    $newDesc     = (Read-Host '  New description (Enter to keep current)').Trim()
-                    Invoke-SetUserInfo -Name $name -UserFullName $newFullName -UserDescription $newDesc
+                    $clearFN     = $false
+                    $clearDesc   = $false
+                    $newFN       = ''
+                    $newDesc     = ''
+
+                    Write-Host "  Current full name  : $(if ($currentUser.FullName)    {$currentUser.FullName}    else {'(none)'})"
+                    Write-Host '    [1] Keep current   [2] Set new value   [3] Clear'
+                    $fnChoice = Read-TuiChoice -Prompt 'Choice' -Valid @('1','2','3')
+                    if     ($fnChoice -eq '2') { $newFN   = Read-TuiNonEmpty -Prompt 'New full name' }
+                    elseif ($fnChoice -eq '3') { $clearFN = $true }
+
+                    Write-Host "  Current description: $(if ($currentUser.Description) {$currentUser.Description} else {'(none)'})"
+                    Write-Host '    [1] Keep current   [2] Set new value   [3] Clear'
+                    $descChoice = Read-TuiChoice -Prompt 'Choice' -Valid @('1','2','3')
+                    if     ($descChoice -eq '2') { $newDesc   = Read-TuiNonEmpty -Prompt 'New description' }
+                    elseif ($descChoice -eq '3') { $clearDesc = $true }
+
+                    Invoke-SetUserInfo -Name $name -UserFullName $newFN -UserDescription $newDesc `
+                                       -ClearFullName $clearFN -ClearDescription $clearDesc
                 }
             }
         }
@@ -642,6 +751,18 @@ function Invoke-TUI {
 #region -- Entry Point ---------------------------------------------------------
 
 if (-not $Action) {
+    if (-not [string]::IsNullOrEmpty($Username)) {
+        # -Username provided without -Action: show account info rather than crashing into TUI
+        Write-Info "WLAM v$($Script:Version)"
+        try {
+            Show-UserInfo -Name $Username
+            exit 0
+        }
+        catch {
+            Write-Fail $_
+            exit 1
+        }
+    }
     Invoke-TUI
     exit 0
 }
@@ -662,7 +783,10 @@ try {
                    -PwLength $PasswordLength `
                    -UserFullName $FullName `
                    -UserDescription $Description `
-                   -MakeAdmin $Admin.IsPresent
+                   -MakeAdmin $Admin.IsPresent `
+                   -NoPassword $NoPassword.IsPresent `
+                   -ClearFullName $ClearFullName.IsPresent `
+                   -ClearDescription $ClearDescription.IsPresent
     exit 0
 }
 catch {
