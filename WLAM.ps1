@@ -109,7 +109,7 @@
     Requires local Administrator privileges.
     Designed for use with TacticalRMM and similar RMM platforms.
     Lock screen hide/show changes may require a sign-out or restart to take effect.
-    Version 1.0.1
+    Version 1.1.0
 #>
 
 param (
@@ -141,7 +141,7 @@ $ErrorActionPreference = 'Stop'
 #region -- Constants -----------------------------------------------------------
 
 # Update this value when cutting a new release
-$Script:Version = '1.0.1'
+$Script:Version = '1.1.0'
 
 $RegKeyPath = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\SpecialAccounts\UserList'
 $AdminSID   = 'S-1-5-32-544'   # Builtin\Administrators
