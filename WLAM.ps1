@@ -57,6 +57,11 @@
 .PARAMETER ClearDescription
     Switch. When used with SetInfo, clears the description field to blank.
 
+.PARAMETER NoMustChangePassword
+    Switch. When used with Create and NoPassword, suppresses the default Windows
+    behaviour of requiring the user to set a password at next logon.
+    Has no effect when a password is provided, as that flag is not set in that case.
+
 .EXAMPLE
     # Launch the interactive TUI (no arguments)
     .\WLAM.ps1
@@ -102,6 +107,10 @@
     .\WLAM.ps1 -Username jdoe -Action SetInfo -ClearFullName -Description "Finance dept"
 
 .EXAMPLE
+    # Create an account with no password, no logon password prompt
+    .\WLAM.ps1 -Username jdoe -Action Create -NoPassword -NoMustChangePassword
+
+.EXAMPLE
     # Delete an account
     .\WLAM.ps1 -Username olduser -Action Delete
 
@@ -109,7 +118,7 @@
     Requires local Administrator privileges.
     Designed for use with TacticalRMM and similar RMM platforms.
     Lock screen hide/show changes may require a sign-out or restart to take effect.
-    Version 1.1.0
+    Version 1.2.0
 #>
 
 param (
@@ -133,7 +142,9 @@ param (
 
     [switch]$ClearFullName,
 
-    [switch]$ClearDescription
+    [switch]$ClearDescription,
+
+    [switch]$NoMustChangePassword
 )
 
 $ErrorActionPreference = 'Stop'
@@ -141,7 +152,7 @@ $ErrorActionPreference = 'Stop'
 #region -- Constants -----------------------------------------------------------
 
 # Update this value when cutting a new release
-$Script:Version = '1.1.0'
+$Script:Version = '1.2.0'
 
 $RegKeyPath = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\SpecialAccounts\UserList'
 $AdminSID   = 'S-1-5-32-544'   # Builtin\Administrators
@@ -263,7 +274,8 @@ function Invoke-CreateUser {
         [string]$UserFullName,
         [string]$UserDescription,
         [bool]$MakeAdmin,
-        [bool]$NoPassword
+        [bool]$NoPassword,
+        [bool]$NoMustChangePassword
     )
     Assert-UserNotExists -Name $Name
     if ($NoPassword) {
@@ -271,6 +283,17 @@ function Invoke-CreateUser {
                       -NoPassword `
                       -FullName $UserFullName `
                       -Description $UserDescription | Out-Null
+        # -PasswordNeverExpires cannot be combined with -NoPassword in New-LocalUser,
+        # so we set it immediately after creation
+        Set-LocalUser -Name $Name -PasswordNeverExpires $true
+        if ($NoMustChangePassword) {
+            # The LocalAccounts module has no direct parameter to clear this flag;
+            # ADSI is the reliable cross-version approach
+            $adsiUser = [adsi]"WinNT://$env:COMPUTERNAME/$Name,user"
+            $adsiUser.PasswordExpired = 0
+            $adsiUser.SetInfo()
+            Write-Info "Must-change-password at next logon disabled for '$Name'."
+        }
     }
     else {
         $securePass = ConvertTo-SecureStringLocal -Plaintext $PlainPassword
@@ -452,7 +475,8 @@ function Invoke-Actions {
         [bool]$MakeAdmin,
         [bool]$NoPassword,
         [bool]$ClearFullName,
-        [bool]$ClearDescription
+        [bool]$ClearDescription,
+        [bool]$NoMustChangePassword
     )
 
     # Sort into a safe logical execution order regardless of what the caller supplied
@@ -470,7 +494,7 @@ function Invoke-Actions {
         Write-Info "--- Action: $a ---"
         switch ($a) {
             'List'          { Invoke-ListUsers }
-            'Create'        { Invoke-CreateUser -Name $Name -PlainPassword $PlainPassword -UserFullName $UserFullName -UserDescription $UserDescription -MakeAdmin $MakeAdmin -NoPassword $NoPassword }
+            'Create'        { Invoke-CreateUser -Name $Name -PlainPassword $PlainPassword -UserFullName $UserFullName -UserDescription $UserDescription -MakeAdmin $MakeAdmin -NoPassword $NoPassword -NoMustChangePassword $NoMustChangePassword }
             'Delete'        { Invoke-DeleteUser -Name $Name }
             'Enable'        { Invoke-EnableUser -Name $Name }
             'Disable'       { Invoke-DisableUser -Name $Name }
@@ -589,8 +613,15 @@ function Invoke-TuiCreateUser {
     Write-Host '  Account type:  [1] Standard User   [2] Administrator'
     $makeAdmin = (Read-TuiChoice -Prompt 'Choice' -Valid @('1', '2')) -eq '2'
 
-    $pw        = Read-TuiPassword -Context 'Password'
-    $noPw      = ($null -eq $pw)
+    $pw              = Read-TuiPassword -Context 'Password'
+    $noPw            = ($null -eq $pw)
+    $noMustChangePw  = $false
+
+    if ($noPw) {
+        Write-Host ''
+        Write-Host '  Require password change at next logon?  [1] Yes (default)   [2] No'
+        $noMustChangePw = (Read-TuiChoice -Prompt 'Choice' -Valid @('1','2')) -eq '2'
+    }
 
     try {
         Invoke-CreateUser -Name $name `
@@ -598,7 +629,8 @@ function Invoke-TuiCreateUser {
                           -UserFullName $fullName `
                           -UserDescription $desc `
                           -MakeAdmin $makeAdmin `
-                          -NoPassword $noPw
+                          -NoPassword $noPw `
+                          -NoMustChangePassword $noMustChangePw
         Write-Host ''
         Write-Host "  [OK] Created : $name" -ForegroundColor Green
         Write-Host "       Password: $(if ($noPw) {'(none)'} else {$pw})" -ForegroundColor Green
@@ -786,7 +818,8 @@ try {
                    -MakeAdmin $Admin.IsPresent `
                    -NoPassword $NoPassword.IsPresent `
                    -ClearFullName $ClearFullName.IsPresent `
-                   -ClearDescription $ClearDescription.IsPresent
+                   -ClearDescription $ClearDescription.IsPresent `
+                   -NoMustChangePassword $NoMustChangePassword.IsPresent
     exit 0
 }
 catch {
