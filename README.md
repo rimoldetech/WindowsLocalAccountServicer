@@ -64,6 +64,7 @@ Run WLAM with no arguments to launch the menu interface.
 | `-NoPassword` | switch | No | When used with `Create`, creates the account with no password. When used with `ResetPassword`, removes the existing password. |
 | `-ClearFullName` | switch | No | When used with `SetInfo`, clears the full name field to blank. |
 | `-ClearDescription` | switch | No | When used with `SetInfo`, clears the description field to blank. |
+| `-NoMustChangePassword` | switch | No | When used with `Create` and `-NoPassword`, suppresses the default Windows behaviour of requiring the user to set a password at next logon. |
 
 ---
 
@@ -112,6 +113,11 @@ When multiple actions are specified, they always execute in this order regardles
 **Create an account with no password**
 ```powershell
 .\WLAM.ps1 -Username jdoe -Action Create -NoPassword
+```
+
+**Create an account with no password and no logon prompt to set one**
+```powershell
+.\WLAM.ps1 -Username jdoe -Action Create -NoPassword -NoMustChangePassword
 ```
 
 **Create an admin account, hide from lock screen, and enable in one run**
@@ -178,6 +184,8 @@ This script is designed to work cleanly within TacticalRMM:
 - `Demote` always ensures the account remains in the Users group after removal from Administrators, consistent with Windows built-in behaviour
 - Deleting an account automatically removes its lock screen registry entry if one exists, preventing it from being silently inherited by a future account with the same username
 - Passing `-Username` without `-Action` displays a summary of that account rather than launching the TUI, making it safe to use in RMM contexts
+- All accounts are created with **Password Never Expires** enabled. This applies to both password and no-password accounts
+- When creating an account with `-NoPassword`, Windows will by default prompt the user to set a password at next logon. Pass `-NoMustChangePassword` to suppress this — useful for personal machines or shared kiosk-style accounts where no password is intentional
 - The random password generator uses `RNGCryptoServiceProvider` and guarantees at least one lowercase letter, uppercase letter, digit, and special character in every generated password
 
 ---
