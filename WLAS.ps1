@@ -2,7 +2,7 @@
 
 <#
 .SYNOPSIS
-    Windows Local Account Manager (WLAM) - Robust local account manager for Windows.
+    Windows Local Account Servicer (WLAS) - Robust local account manager for Windows.
 
 .DESCRIPTION
     Unified local user account manager supporting both an interactive TUI and
@@ -64,61 +64,61 @@
 
 .EXAMPLE
     # Launch the interactive TUI (no arguments)
-    .\WLAM.ps1
+    .\WLAS.ps1
 
 .EXAMPLE
     # List all local accounts
-    .\WLAM.ps1 -Action List
+    .\WLAS.ps1 -Action List
 
 .EXAMPLE
     # Create a standard user; password is generated automatically
-    .\WLAM.ps1 -Username jdoe -Action Create -FullName "John Doe"
+    .\WLAS.ps1 -Username jdoe -Action Create -FullName "John Doe"
 
 .EXAMPLE
     # Create an admin account with a specific password
-    .\WLAM.ps1 -Username svcadmin -Action Create -Password "P@ssw0rd!" -Admin
+    .\WLAS.ps1 -Username svcadmin -Action Create -Password "P@ssw0rd!" -Admin
 
 .EXAMPLE
     # Create a user, hide from lock screen, and enable -- all in one run
-    .\WLAM.ps1 -Username svcadmin -Action Create,Hide,Enable -Admin
+    .\WLAS.ps1 -Username svcadmin -Action Create,Hide,Enable -Admin
 
 .EXAMPLE
     # Reset password to a random value and hide from lock screen
-    .\WLAM.ps1 -Username jdoe -Action ResetPassword,Hide
+    .\WLAS.ps1 -Username jdoe -Action ResetPassword,Hide
 
 .EXAMPLE
     # Promote and enable an existing account
-    .\WLAM.ps1 -Username jdoe -Action Promote,Enable
+    .\WLAS.ps1 -Username jdoe -Action Promote,Enable
 
 .EXAMPLE
     # Reset password to something specific
-    .\WLAM.ps1 -Username jdoe -Action ResetPassword -Password "NewP@ss1"
+    .\WLAS.ps1 -Username jdoe -Action ResetPassword -Password "NewP@ss1"
 
 .EXAMPLE
     # Create an account with no password
-    .\WLAM.ps1 -Username jdoe -Action Create -NoPassword
+    .\WLAS.ps1 -Username jdoe -Action Create -NoPassword
 
 .EXAMPLE
     # Remove a user's password
-    .\WLAM.ps1 -Username jdoe -Action ResetPassword -NoPassword
+    .\WLAS.ps1 -Username jdoe -Action ResetPassword -NoPassword
 
 .EXAMPLE
     # Clear a user's full name and set a new description
-    .\WLAM.ps1 -Username jdoe -Action SetInfo -ClearFullName -Description "Finance dept"
+    .\WLAS.ps1 -Username jdoe -Action SetInfo -ClearFullName -Description "Finance dept"
 
 .EXAMPLE
     # Create an account with no password, no logon password prompt
-    .\WLAM.ps1 -Username jdoe -Action Create -NoPassword -NoMustChangePassword
+    .\WLAS.ps1 -Username jdoe -Action Create -NoPassword -NoMustChangePassword
 
 .EXAMPLE
     # Delete an account
-    .\WLAM.ps1 -Username olduser -Action Delete
+    .\WLAS.ps1 -Username olduser -Action Delete
 
 .NOTES
     Requires local Administrator privileges.
     Designed for use with TacticalRMM and similar RMM platforms.
     Lock screen hide/show changes may require a sign-out or restart to take effect.
-    Version 1.2.0
+    Version 1.3.0
 #>
 
 param (
@@ -152,7 +152,7 @@ $ErrorActionPreference = 'Stop'
 #region -- Constants -----------------------------------------------------------
 
 # Update this value when cutting a new release
-$Script:Version = '1.2.0'
+$Script:Version = '1.3.0'
 
 $RegKeyPath = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\SpecialAccounts\UserList'
 $AdminSID   = 'S-1-5-32-544'   # Builtin\Administrators
@@ -515,9 +515,9 @@ function Invoke-Actions {
 function Write-TuiBanner {
     Clear-Host
     Write-Host ''
-    Write-Host '  +-------------------------------------------+' -ForegroundColor Cyan
-    Write-Host ('  |    WLAM v{0} - Local Account Manager    |' -f $Script:Version) -ForegroundColor Cyan
-    Write-Host '  +-------------------------------------------+' -ForegroundColor Cyan
+    Write-Host '  +------------------------------------------+' -ForegroundColor Cyan
+    Write-Host ('  |   WLAS v{0} - Local Account Servicer   |' -f $Script:Version) -ForegroundColor Cyan
+    Write-Host '  +------------------------------------------+' -ForegroundColor Cyan
     Write-Host ''
 }
 
@@ -785,7 +785,7 @@ function Invoke-TUI {
 if (-not $Action) {
     if (-not [string]::IsNullOrEmpty($Username)) {
         # -Username provided without -Action: show account info rather than crashing into TUI
-        Write-Info "WLAM v$($Script:Version)"
+        Write-Info "WLAS v$($Script:Version)"
         try {
             Show-UserInfo -Name $Username
             exit 0
@@ -799,7 +799,7 @@ if (-not $Action) {
     exit 0
 }
 
-Write-Info "WLAM v$($Script:Version)"
+Write-Info "WLAS v$($Script:Version)"
 
 # Non-interactive: ensure a username is present for every action that needs one
 $actionsNeedingUser = $Action | Where-Object { $_ -ne 'List' }

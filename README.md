@@ -1,8 +1,8 @@
-# Windows Local Account Manager (WLAM)
+# Windows Local Account Servicer (WLAS)
 
 A robust PowerShell script for managing local Windows user accounts. Designed for use with [TacticalRMM](https://docs.tacticalrmm.com/) and similar RMM platforms, but equally useful interactively — run it without arguments to get a full text-based menu interface.
 
-WLAM consolidates account creation, password management, enable/disable, Administrator promotion/demotion, lock screen visibility, and account info updates into a single script. Multiple actions can be combined in one invocation, and passwords are generated cryptographically at random when not provided.
+WLAS consolidates account creation, password management, enable/disable, Administrator promotion/demotion, lock screen visibility, and account info updates into a single script. Multiple actions can be combined in one invocation, and passwords are generated cryptographically at random when not provided.
 
 ---
 
@@ -36,16 +36,16 @@ WLAM consolidates account creation, password management, enable/disable, Adminis
 
 ### Interactive TUI
 
-Run WLAM with no arguments to launch the menu interface.
+Run WLAS with no arguments to launch the menu interface.
 
 ```powershell
-.\WLAM.ps1
+.\WLAS.ps1
 ```
 
 ### Non-Interactive (RMM / CLI)
 
 ```powershell
-.\WLAM.ps1 -Username <string> -Action <action[,action,...]> [options]
+.\WLAS.ps1 -Username <string> -Action <action[,action,...]> [options]
 ```
 
 ---
@@ -92,77 +92,77 @@ When multiple actions are specified, they always execute in this order regardles
 
 **List all local accounts**
 ```powershell
-.\WLAM.ps1 -Action List
+.\WLAS.ps1 -Action List
 ```
 
 **Show information for a specific account**
 ```powershell
-.\WLAM.ps1 -Username jdoe
+.\WLAS.ps1 -Username jdoe
 ```
 
 **Create a standard user with a random password**
 ```powershell
-.\WLAM.ps1 -Username jdoe -Action Create -FullName "John Doe"
+.\WLAS.ps1 -Username jdoe -Action Create -FullName "John Doe"
 ```
 
 **Create an admin account with a specific password**
 ```powershell
-.\WLAM.ps1 -Username svcadmin -Action Create -Password "P@ssw0rd!" -Admin
+.\WLAS.ps1 -Username svcadmin -Action Create -Password "P@ssw0rd!" -Admin
 ```
 
 **Create an account with no password**
 ```powershell
-.\WLAM.ps1 -Username jdoe -Action Create -NoPassword
+.\WLAS.ps1 -Username jdoe -Action Create -NoPassword
 ```
 
 **Create an account with no password and no logon prompt to set one**
 ```powershell
-.\WLAM.ps1 -Username jdoe -Action Create -NoPassword -NoMustChangePassword
+.\WLAS.ps1 -Username jdoe -Action Create -NoPassword -NoMustChangePassword
 ```
 
 **Create an admin account, hide from lock screen, and enable in one run**
 ```powershell
-.\WLAM.ps1 -Username svcadmin -Action Create,Hide,Enable -Admin
+.\WLAS.ps1 -Username svcadmin -Action Create,Hide,Enable -Admin
 ```
 
 **Reset a password (random) and hide from lock screen**
 ```powershell
-.\WLAM.ps1 -Username jdoe -Action ResetPassword,Hide
+.\WLAS.ps1 -Username jdoe -Action ResetPassword,Hide
 ```
 
 **Remove a user's password**
 ```powershell
-.\WLAM.ps1 -Username jdoe -Action ResetPassword -NoPassword
+.\WLAS.ps1 -Username jdoe -Action ResetPassword -NoPassword
 ```
 
 **Promote an existing account and enable it**
 ```powershell
-.\WLAM.ps1 -Username jdoe -Action Promote,Enable
+.\WLAS.ps1 -Username jdoe -Action Promote,Enable
 ```
 
 **Update full name and description**
 ```powershell
-.\WLAM.ps1 -Username jdoe -Action SetInfo -FullName "John Doe" -Description "Finance dept"
+.\WLAS.ps1 -Username jdoe -Action SetInfo -FullName "John Doe" -Description "Finance dept"
 ```
 
 **Clear a user's full name and set a new description**
 ```powershell
-.\WLAM.ps1 -Username jdoe -Action SetInfo -ClearFullName -Description "Finance dept"
+.\WLAS.ps1 -Username jdoe -Action SetInfo -ClearFullName -Description "Finance dept"
 ```
 
 **Clear both full name and description**
 ```powershell
-.\WLAM.ps1 -Username jdoe -Action SetInfo -ClearFullName -ClearDescription
+.\WLAS.ps1 -Username jdoe -Action SetInfo -ClearFullName -ClearDescription
 ```
 
 **Disable an account**
 ```powershell
-.\WLAM.ps1 -Username jdoe -Action Disable
+.\WLAS.ps1 -Username jdoe -Action Disable
 ```
 
 **Delete an account**
 ```powershell
-.\WLAM.ps1 -Username olduser -Action Delete
+.\WLAS.ps1 -Username olduser -Action Delete
 ```
 
 ---
