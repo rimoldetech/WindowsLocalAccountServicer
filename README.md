@@ -1,6 +1,6 @@
 # Windows Local Account Servicer (WLAS)
 
-A robust PowerShell script for managing local Windows user accounts. Designed for use with [TacticalRMM](https://docs.tacticalrmm.com/) and similar RMM platforms, but equally useful interactively — run it without arguments to get a full text-based menu interface.
+A robust PowerShell script for servicing local Windows user accounts. Designed for use with [TacticalRMM](https://docs.tacticalrmm.com/) and similar RMM platforms, but equally useful interactively — run it without arguments to get a full text-based menu interface.
 
 WLAS consolidates account creation, password management, enable/disable, Administrator promotion/demotion, lock screen visibility, and account info updates into a single script. Multiple actions can be combined in one invocation, and passwords are generated cryptographically at random when not provided.
 
