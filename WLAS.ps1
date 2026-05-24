@@ -2,10 +2,10 @@
 
 <#
 .SYNOPSIS
-    Windows Local Account Servicer (WLAS) - Robust local account manager for Windows.
+    Windows Local Account Servicer (WLAS) - Local account management for Windows.
 
 .DESCRIPTION
-    Unified local user account manager supporting both an interactive TUI and
+    Unified local account servicing tool supporting both an interactive TUI and
     non-interactive CLI/RMM mode. Consolidates account creation, password resets,
     enable/disable, group promotion/demotion, and lock screen visibility into a
     single script. Supports multiple simultaneous actions in one invocation.
@@ -118,7 +118,8 @@
     Requires local Administrator privileges.
     Designed for use with TacticalRMM and similar RMM platforms.
     Lock screen hide/show changes may require a sign-out or restart to take effect.
-    Version 1.3.0
+    Version 1.3.1
+	Repo: https://github.com/rimoldetech/WindowsLocalAccountServicer
 #>
 
 param (
@@ -152,7 +153,10 @@ $ErrorActionPreference = 'Stop'
 #region -- Constants -----------------------------------------------------------
 
 # Update this value when cutting a new release
-$Script:Version = '1.3.0'
+$Script:Version = '1.3.1'
+
+# Repo URL
+$Script:RepoUrl = 'https://github.com/rimoldetech/WindowsLocalAccountServicer'
 
 $RegKeyPath = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\SpecialAccounts\UserList'
 $AdminSID   = 'S-1-5-32-544'   # Builtin\Administrators
@@ -518,6 +522,15 @@ function Write-TuiBanner {
     Write-Host '  +------------------------------------------+' -ForegroundColor Cyan
     Write-Host ('  |   WLAS v{0} - Local Account Servicer   |' -f $Script:Version) -ForegroundColor Cyan
     Write-Host '  +------------------------------------------+' -ForegroundColor Cyan
+    # OSC 8 hyperlinks are supported in Windows Terminal, VS Code, and most modern
+    # SSH clients. Falls back to plain text in terminals that don't support VT sequences.
+    $esc = [char]27
+    if ($host.UI.SupportsVirtualTerminal) {
+        Write-Host "  $esc]8;;$($Script:RepoUrl)$esc\$($Script:RepoUrl)$esc]8;;$esc\" -ForegroundColor DarkGray
+    }
+    else {
+        Write-Host "  $($Script:RepoUrl)" -ForegroundColor DarkGray
+    }
     Write-Host ''
 }
 
