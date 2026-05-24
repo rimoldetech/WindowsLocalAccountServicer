@@ -109,7 +109,7 @@
     Requires local Administrator privileges.
     Designed for use with TacticalRMM and similar RMM platforms.
     Lock screen hide/show changes may require a sign-out or restart to take effect.
-    Version 1.3.2
+    Version 1.4.0
 	Repo: https://github.com/rimoldetech/WindowsLocalAccountServicer
 #>
 
@@ -142,7 +142,7 @@ $ErrorActionPreference = 'Stop'
 #region -- Constants -----------------------------------------------------------
 
 # Update this value when cutting a new release
-$Script:Version = '1.3.2'
+$Script:Version = '1.4.0'
 
 # Repo URL
 $Script:RepoUrl = 'https://github.com/rimoldetech/WindowsLocalAccountServicer'
