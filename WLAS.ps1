@@ -1,5 +1,10 @@
 #Requires -RunAsAdministrator
 
+# Windows Local Account Servicer (WLAS)
+# Copyright (c) 2026 Rimolde Technology Services (RTS)
+# Licensed under the MIT License - https://opensource.org/licenses/MIT
+# https://github.com/rimoldetech/WindowsLocalAccountServicer
+
 <#
 .SYNOPSIS
     Windows Local Account Servicer (WLAS) - Local account management for Windows.
@@ -31,8 +36,26 @@
         SetInfo         Update the full name and/or description of an existing account
 
 .PARAMETER Password
-    Plaintext password for Create or ResetPassword actions.
-    If omitted, a cryptographically random password is generated automatically.
+    Password for Create or ResetPassword actions. If the value passes Base64
+    detection heuristics (valid Base64 characters, length a multiple of 4,
+    decodes to printable text) it will be decoded automatically and noted in
+    the output. Use -PasswordPlain to force plaintext or -PasswordBase64 for
+    explicit Base64 decoding. If omitted, a random password is generated.
+    Cannot be combined with -PasswordBase64 or -PasswordPlain.
+
+.PARAMETER PasswordBase64
+    Base64-encoded password for Create or ResetPassword. Always decoded with
+    no heuristics applied. Use in RMM contexts where special characters such
+    as &, %,  and ^ are interpreted by the shell before PowerShell receives
+    them. Encode with:
+    [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes("YourPassword"))
+    Cannot be combined with -Password or -PasswordBase64.
+
+.PARAMETER PasswordPlain
+    Plaintext password for Create or ResetPassword. Base64 auto-detection is
+    skipped entirely. Use when the password value would otherwise match the
+    Base64 detection heuristics but should be treated as literal text.
+    Cannot be combined with -Password or -PasswordBase64.
 
 .PARAMETER PasswordLength
     Length of the auto-generated random password. Default: 20.
@@ -56,6 +79,12 @@
 
 .PARAMETER ClearDescription
     Switch. When used with SetInfo, clears the description field to blank.
+
+.PARAMETER DeleteProfile
+    Switch. When used with Delete, also removes the user's profile folder and
+    associated registry entries via Win32_UserProfile. The profile must not be
+    currently loaded (i.e. the user must be signed out). Accounts that were
+    created but never signed into will have no profile; this is handled gracefully.
 
 .EXAMPLE
     # Launch the interactive TUI (no arguments)
@@ -90,6 +119,14 @@
     .\WLAS.ps1 -Username jdoe -Action ResetPassword -Password "NewP@ss1"
 
 .EXAMPLE
+    # Create a user with a password containing special characters (base64-encoded)
+    .\WLAS.ps1 -Username jdoe -Action Create -PasswordBase64 <base64string>
+
+.EXAMPLE
+    # Create a user with a plaintext password, bypassing Base64 auto-detection
+    .\WLAS.ps1 -Username jdoe -Action Create -PasswordPlain "MyP4ssword=="
+
+.EXAMPLE
     # Create an account with no password
     .\WLAS.ps1 -Username jdoe -Action Create -NoPassword
 
@@ -102,15 +139,18 @@
     .\WLAS.ps1 -Username jdoe -Action SetInfo -ClearFullName -Description "Finance dept"
 
 .EXAMPLE
-    # Delete an account
+    # Delete an account and remove its profile folder
+    .\WLAS.ps1 -Username olduser -Action Delete -DeleteProfile
+
+.EXAMPLE
+    # Delete an account (profile folder kept)
     .\WLAS.ps1 -Username olduser -Action Delete
 
 .NOTES
     Requires local Administrator privileges.
     Designed for use with TacticalRMM and similar RMM platforms.
     Lock screen hide/show changes may require a sign-out or restart to take effect.
-    Version 1.4.0
-	Repo: https://github.com/rimoldetech/WindowsLocalAccountServicer
+    Version 2.0.0
 #>
 
 param (
@@ -121,6 +161,10 @@ param (
     [string[]]$Action,
 
     [string]$Password,
+
+    [string]$PasswordBase64,
+
+    [string]$PasswordPlain,
 
     [int]$PasswordLength = 20,
 
@@ -134,7 +178,9 @@ param (
 
     [switch]$ClearFullName,
 
-    [switch]$ClearDescription
+    [switch]$ClearDescription,
+
+    [switch]$DeleteProfile
 )
 
 $ErrorActionPreference = 'Stop'
@@ -142,7 +188,7 @@ $ErrorActionPreference = 'Stop'
 #region -- Constants -----------------------------------------------------------
 
 # Update this value when cutting a new release
-$Script:Version = '1.4.0'
+$Script:Version = '2.0.0'
 
 # Repo URL
 $Script:RepoUrl = 'https://github.com/rimoldetech/WindowsLocalAccountServicer'
@@ -199,6 +245,27 @@ function New-RandomPassword {
 
 function ConvertTo-SecureStringLocal ([string]$Plaintext) {
     return (ConvertTo-SecureString -String $Plaintext -AsPlainText -Force)
+}
+
+function Resolve-Password ([string]$Value) {
+    # Auto-detect Base64-encoded passwords passed via -Password.
+    # All four conditions must hold before decoding is attempted:
+    #   1. Only valid Base64 characters (A-Z, a-z, 0-9, +, /)
+    #   2. Optional 1 or 2 '=' padding characters at the end
+    #   3. Total length is a multiple of 4
+    #   4. Decoded bytes form printable ASCII (the primary false-positive filter)
+    # If any condition fails the original string is returned unchanged.
+    if ($Value.Length % 4 -eq 0 -and $Value -match '^[A-Za-z0-9+/]+=?=?$') {
+        try {
+            $decoded = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Value))
+            if ($decoded -match '^[\x20-\x7E]+$') {
+                Write-Info "Password detected as Base64 -- decoded automatically."
+                return $decoded
+            }
+        }
+        catch { <# Decoding failed; treat as plaintext #> }
+    }
+    return $Value
 }
 
 function Get-LocalUserSafe ([string]$Name) {
@@ -300,10 +367,34 @@ function Invoke-CreateUser {
     else             { Write-Info "Password: $PlainPassword" }
 }
 
-function Invoke-DeleteUser ([string]$Name) {
-    Assert-UserExists -Name $Name | Out-Null
+function Invoke-DeleteUser {
+    param (
+        [string]$Name,
+        [bool]$DeleteProfile
+    )
+    $user = Assert-UserExists -Name $Name
+
+    if ($DeleteProfile) {
+        $sid     = $user.SID.Value
+        $profile = Get-CimInstance -ClassName Win32_UserProfile `
+                                   -Filter "SID='$sid'" `
+                                   -ErrorAction SilentlyContinue
+        if ($profile) {
+            if ($profile.Loaded) {
+                throw "Cannot delete the profile for '$Name': it is currently loaded. Ensure the user is fully signed out and try again."
+            }
+            $profilePath = $profile.LocalPath
+            $profile | Remove-CimInstance
+            Write-Ok "User profile deleted: $profilePath"
+        }
+        else {
+            Write-Warn "No profile found for '$Name' -- the account may never have been signed into."
+        }
+    }
+
     Remove-LocalUser -Name $Name
     Write-Ok "Deleted user '$Name'."
+
     if (Test-Path -LiteralPath $RegKeyPath) {
         $prop = Get-ItemProperty -LiteralPath $RegKeyPath -Name $Name -ErrorAction SilentlyContinue
         if ($prop) {
@@ -460,7 +551,8 @@ function Invoke-Actions {
         [bool]$MakeAdmin,
         [bool]$NoPassword,
         [bool]$ClearFullName,
-        [bool]$ClearDescription
+        [bool]$ClearDescription,
+        [bool]$DeleteProfile
     )
 
     # Sort into a safe logical execution order regardless of what the caller supplied
@@ -479,7 +571,7 @@ function Invoke-Actions {
         switch ($a) {
             'List'          { Invoke-ListUsers }
             'Create'        { Invoke-CreateUser -Name $Name -PlainPassword $PlainPassword -UserFullName $UserFullName -UserDescription $UserDescription -MakeAdmin $MakeAdmin -NoPassword $NoPassword }
-            'Delete'        { Invoke-DeleteUser -Name $Name }
+            'Delete'        { Invoke-DeleteUser -Name $Name -DeleteProfile $DeleteProfile }
             'Enable'        { Invoke-EnableUser -Name $Name }
             'Disable'       { Invoke-DisableUser -Name $Name }
             'ResetPassword' { Invoke-ResetPassword -Name $Name -PlainPassword $PlainPassword -NoPassword $NoPassword }
@@ -691,7 +783,9 @@ function Invoke-TuiManageUser {
                 '8' {
                     $confirm = (Read-Host "  Type 'yes' to confirm deletion of '$name'").Trim()
                     if ($confirm -eq 'yes') {
-                        Invoke-DeleteUser -Name $name
+                        Write-Host '  Also delete user profile folder?  [1] Yes   [2] No'
+                        $delProfile = (Read-TuiChoice -Prompt 'Choice' -Valid @('1','2')) -eq '1'
+                        Invoke-DeleteUser -Name $name -DeleteProfile $delProfile
                         Invoke-TuiResult "Account '$name' deleted."
                         Invoke-TuiPause
                         return
@@ -786,6 +880,37 @@ if (-not $Action) {
 
 Write-Info "WLAS v$($Script:Version)"
 
+# Decode base64 password if provided — use this in RMM contexts where special
+# characters in -Password are interpreted by the shell before PowerShell sees them
+# Validate that only one password input method is provided
+$pwInputCount = @($Password, $PasswordBase64, $PasswordPlain) |
+    Where-Object { -not [string]::IsNullOrEmpty($_) } |
+    Measure-Object | Select-Object -ExpandProperty Count
+if ($pwInputCount -gt 1) {
+    Write-Fail "Only one of -Password, -PasswordBase64, or -PasswordPlain may be specified."
+    exit 1
+}
+
+if (-not [string]::IsNullOrEmpty($PasswordBase64)) {
+    # Explicit Base64 -- always decode, no heuristics
+    try {
+        $Password = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($PasswordBase64))
+    }
+    catch {
+        Write-Fail "Failed to decode -PasswordBase64. Ensure the value is valid Base64: $_"
+        exit 1
+    }
+}
+elseif (-not [string]::IsNullOrEmpty($PasswordPlain)) {
+    # Explicit plaintext -- use as-is, skip auto-detection entirely
+    $Password = $PasswordPlain
+    Write-Info "Using -PasswordPlain -- Base64 auto-detection skipped."
+}
+elseif (-not [string]::IsNullOrEmpty($Password)) {
+    # Auto-detect -- decode if it looks like Base64, otherwise use as-is
+    $Password = Resolve-Password -Value $Password
+}
+
 # Non-interactive: ensure a username is present for every action that needs one
 $actionsNeedingUser = $Action | Where-Object { $_ -ne 'List' }
 if ($actionsNeedingUser -and [string]::IsNullOrEmpty($Username)) {
@@ -803,7 +928,8 @@ try {
                    -MakeAdmin $Admin.IsPresent `
                    -NoPassword $NoPassword.IsPresent `
                    -ClearFullName $ClearFullName.IsPresent `
-                   -ClearDescription $ClearDescription.IsPresent
+                   -ClearDescription $ClearDescription.IsPresent `
+                   -DeleteProfile $DeleteProfile.IsPresent
     exit 0
 }
 catch {
