@@ -150,7 +150,7 @@
     Requires local Administrator privileges.
     Designed for use with TacticalRMM and similar RMM platforms.
     Lock screen hide/show changes may require a sign-out or restart to take effect.
-    Version 2.0.0
+    Version 2.0.1
 #>
 
 param (
@@ -188,7 +188,7 @@ $ErrorActionPreference = 'Stop'
 #region -- Constants -----------------------------------------------------------
 
 # Update this value when cutting a new release
-$Script:Version = '2.0.0'
+$Script:Version = '2.0.1'
 
 # Repo URL
 $Script:RepoUrl = 'https://github.com/rimoldetech/WindowsLocalAccountServicer'
@@ -591,9 +591,9 @@ function Invoke-Actions {
 function Write-TuiBanner {
     Clear-Host
     Write-Host ''
-    Write-Host '  +------------------------------------------+' -ForegroundColor Cyan
-    Write-Host ('  |   WLAS v{0} - Local Account Servicer   |' -f $Script:Version) -ForegroundColor Cyan
-    Write-Host '  +------------------------------------------+' -ForegroundColor Cyan
+    Write-Host '  +-----------------+' -ForegroundColor Cyan
+    Write-Host ('  |   WLAS v{0}   |' -f $Script:Version) -ForegroundColor Cyan
+    Write-Host '  +-----------------+' -ForegroundColor Cyan
     # OSC 8 hyperlinks are supported in Windows Terminal, VS Code, and most modern
     # SSH clients. Falls back to plain text in terminals that don't support VT sequences.
     $esc = [char]27
