@@ -56,7 +56,9 @@ Run WLAS with no arguments to launch the menu interface.
 |---|---|---|---|
 | `-Username` | string | For most actions | Target local account name. Not required for `List`. When passed alone without `-Action`, displays account information. |
 | `-Action` | string[] | Yes | One or more actions to perform (see below). Comma-separated or passed multiple times. |
-| `-Password` | string | No | Plaintext password for `Create` or `ResetPassword`. Auto-generated if omitted. |
+| `-Password` | string | No | Password for `Create` or `ResetPassword`. Auto-generated if omitted. If the value looks like Base64 (valid characters, length a multiple of 4, decodes to printable text) it will be decoded automatically and noted in output. Cannot be combined with `-PasswordBase64` or `-PasswordPlain`. |
+| `-PasswordBase64` | string | No | Base64-encoded password. Always decoded — no heuristics applied. Useful in RMM contexts where special characters such as `&`, `%`, and `^` are interpreted by the shell before PowerShell receives them. Cannot be combined with `-Password` or `-PasswordPlain`. |
+| `-PasswordPlain` | string | No | Plaintext password. Base64 auto-detection is skipped entirely. Use when the password would otherwise match the Base64 heuristics but should be treated as literal text. Cannot be combined with `-Password` or `-PasswordBase64`. |
 | `-PasswordLength` | int | No | Length of the auto-generated password. Default: `20`. |
 | `-FullName` | string | No | Display name for the account. Used with `Create` and `SetInfo`. |
 | `-Description` | string | No | Account description. Used with `Create` and `SetInfo`. |
@@ -64,6 +66,7 @@ Run WLAS with no arguments to launch the menu interface.
 | `-NoPassword` | switch | No | When used with `Create`, creates the account with no password. When used with `ResetPassword`, removes the existing password. |
 | `-ClearFullName` | switch | No | When used with `SetInfo`, clears the full name field to blank. |
 | `-ClearDescription` | switch | No | When used with `SetInfo`, clears the description field to blank. |
+| `-DeleteProfile` | switch | No | When used with `Delete`, also removes the user's profile folder and associated registry entries. The user must be fully signed out. |
 
 ---
 
@@ -73,7 +76,7 @@ Run WLAS with no arguments to launch the menu interface.
 |---|---|
 | `List` | List all local accounts with Enabled, Admin, Hidden, and description status. |
 | `Create` | Create a new local user account. |
-| `Delete` | Delete an account. Also removes any associated lock screen registry entry. |
+| `Delete` | Delete an account. Also removes any associated lock screen registry entry. Use `-DeleteProfile` to also remove the user's profile folder. |
 | `Enable` | Enable a disabled account. |
 | `Disable` | Disable an account. |
 | `ResetPassword` | Reset the account password. Generates a random password if `-Password` is not provided. Use `-NoPassword` to remove the password entirely. |
@@ -149,6 +152,19 @@ When multiple actions are specified, they always execute in this order regardles
 .\WLAS.ps1 -Username jdoe -Action SetInfo -ClearFullName -ClearDescription
 ```
 
+**Create a user with a password containing special characters (Base64-encoded)**
+```powershell
+# Generate the encoded value first in any PowerShell session:
+[Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes("P@ssw&rd!"))
+# Then pass the output to the script:
+.\WLAS.ps1 -Username jdoe -Action Create -PasswordBase64 <base64string>
+```
+
+**Create a user forcing plaintext mode (bypasses Base64 auto-detection)**
+```powershell
+.\WLAS.ps1 -Username jdoe -Action Create -PasswordPlain "MyP4ssword=="
+```
+
 **Disable an account**
 ```powershell
 .\WLAS.ps1 -Username jdoe -Action Disable
@@ -157,6 +173,11 @@ When multiple actions are specified, they always execute in this order regardles
 **Delete an account**
 ```powershell
 .\WLAS.ps1 -Username olduser -Action Delete
+```
+
+**Delete an account and remove its profile folder**
+```powershell
+.\WLAS.ps1 -Username olduser -Action Delete -DeleteProfile
 ```
 
 ---
@@ -169,6 +190,7 @@ This script is designed to work cleanly within TacticalRMM:
 - Exit codes: `0` on success, `1` on error
 - The `[OK]`, `[INFO]`, `[WARN]`, and `[ERROR]` output prefixes are consistent across all actions and suitable for log parsing or alert conditions
 - Pass arguments directly via the script arguments field; no modification to the script is needed per-deployment
+- For passwords containing special characters (`&`, `%`, `^` etc.), use `-PasswordBase64` to avoid shell interpretation issues. Generate the encoded value once in any PowerShell session and store it as a script argument or custom field in Tactical. Use `-PasswordPlain` if you need to guarantee a value is never interpreted as Base64
 
 ---
 
@@ -177,9 +199,11 @@ This script is designed to work cleanly within TacticalRMM:
 - Lock screen `Hide`/`Show` changes may require a sign-out or restart to take effect, depending on the environment
 - `Demote` always ensures the account remains in the Users group after removal from Administrators, consistent with Windows built-in behaviour
 - Deleting an account automatically removes its lock screen registry entry if one exists, preventing it from being silently inherited by a future account with the same username
+- `-DeleteProfile` uses `Win32_UserProfile` to remove the user's profile folder and registry hive the way Windows intends — the same mechanism behind the Delete button in System Properties → User Profiles. The user must be fully signed out; if the profile is loaded the operation will fail cleanly without deleting the account. Accounts that were never signed into have no registered profile and this is handled gracefully
 - Passing `-Username` without `-Action` displays a summary of that account rather than launching the TUI, making it safe to use in RMM contexts
 - All accounts are created with **Password Never Expires** enabled. This applies to both password and no-password accounts. As Windows enforces mutual exclusivity between this and the must-change-password flag, the latter is always effectively off
 - The random password generator uses `RNGCryptoServiceProvider` and guarantees at least one lowercase letter, uppercase letter, digit, and special character in every generated password
+- `-Password` will auto-detect and decode Base64-encoded values. Use `-PasswordBase64` to always decode explicitly, or `-PasswordPlain` to always treat as literal text with no detection. Only one of the three may be specified per invocation
 
 ---
 
