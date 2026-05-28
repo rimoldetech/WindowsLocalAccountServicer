@@ -144,7 +144,7 @@
 
 .PARAMETER ShowHelp
     Displays a brief summary of all actions and options. Also triggered by -h,
-    -help, --help, and /?. Use /? for full comment-based help via Get-Help.
+    -help, --help, and /?.
 
 .EXAMPLE
     # Show brief help
@@ -158,7 +158,7 @@
     Requires local Administrator privileges.
     Designed for use with TacticalRMM and similar RMM platforms.
     Lock screen hide/show changes may require a sign-out or restart to take effect.
-    Version 2.1.1
+    Version 2.1.2
 #>
 
 param (
@@ -190,7 +190,7 @@ param (
 
     [switch]$DeleteProfile,
 
-    [Alias('h', 'Help', 'help')]
+    [Alias('h', 'help')]
     [switch]$ShowHelp
 )
 
@@ -199,7 +199,7 @@ $ErrorActionPreference = 'Stop'
 #region -- Constants -----------------------------------------------------------
 
 # Update this value when cutting a new release
-$Script:Version = '2.1.1'
+$Script:Version = '2.1.2'
 
 # Repo URL
 $Script:RepoUrl = 'https://github.com/rimoldetech/WindowsLocalAccountServicer'
