@@ -142,9 +142,9 @@
     # Delete an account and remove its profile folder
     .\WLAS.ps1 -Username olduser -Action Delete -DeleteProfile
 
-.PARAMETER Help
-    Displays a brief summary of all actions and options. Also triggered by -h
-    and --help. Use /? for full comment-based help via PowerShell's Get-Help.
+.PARAMETER ShowHelp
+    Displays a brief summary of all actions and options. Also triggered by -h,
+    -help, --help, and /?. Use /? for full comment-based help via Get-Help.
 
 .EXAMPLE
     # Show brief help
@@ -158,7 +158,7 @@
     Requires local Administrator privileges.
     Designed for use with TacticalRMM and similar RMM platforms.
     Lock screen hide/show changes may require a sign-out or restart to take effect.
-    Version 2.1.0
+    Version 2.1.1
 #>
 
 param (
@@ -190,8 +190,8 @@ param (
 
     [switch]$DeleteProfile,
 
-    [Alias('h')]
-    [switch]$Help
+    [Alias('h', 'Help', 'help')]
+    [switch]$ShowHelp
 )
 
 $ErrorActionPreference = 'Stop'
@@ -199,7 +199,7 @@ $ErrorActionPreference = 'Stop'
 #region -- Constants -----------------------------------------------------------
 
 # Update this value when cutting a new release
-$Script:Version = '2.1.0'
+$Script:Version = '2.1.1'
 
 # Repo URL
 $Script:RepoUrl = 'https://github.com/rimoldetech/WindowsLocalAccountServicer'
@@ -881,8 +881,7 @@ function Show-Help {
     Write-Host '    .\WLAS.ps1                                    Launch interactive TUI'
     Write-Host '    .\WLAS.ps1 -Username <user> -Action <action> [options]'
     Write-Host '    .\WLAS.ps1 -Username <user>                   Show account information'
-    Write-Host '    .\WLAS.ps1 -h | --help                        Show this help'
-    Write-Host '    .\WLAS.ps1 /?                                 Full help via Get-Help'
+    Write-Host '    .\WLAS.ps1 -h  /  --help  /  /?            Show this help'
     Write-Host ''
     Write-Host '  ACTIONS' -ForegroundColor Yellow
     Write-Host '    List            List all local accounts'
@@ -916,7 +915,8 @@ function Show-Help {
 
 #region -- Entry Point ---------------------------------------------------------
 
-if ($Help -or $args -contains 'help' -or $args -contains '--help') {
+$helpTriggers = @('/?', '--help', '-help', '/help')
+if ($ShowHelp -or ($Username -in $helpTriggers) -or ($args | Where-Object { $_ -in $helpTriggers })) {
     Show-Help
     exit 0
 }
