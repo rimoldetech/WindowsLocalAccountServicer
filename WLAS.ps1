@@ -36,12 +36,9 @@
         SetInfo         Update the full name and/or description of an existing account
 
 .PARAMETER Password
-    Password for Create or ResetPassword actions. If the value passes Base64
-    detection heuristics (valid Base64 characters, length a multiple of 4,
-    decodes to printable text) it will be decoded automatically and noted in
-    the output. Use -PasswordPlain to force plaintext or -PasswordBase64 for
-    explicit Base64 decoding. If omitted, a random password is generated.
-    Cannot be combined with -PasswordBase64 or -PasswordPlain.
+    Plaintext password for Create or ResetPassword actions. Passed through as-is
+    with no Base64 detection or decoding. If omitted, a random password is generated.
+    Cannot be combined with -PasswordBase64.
 
 .PARAMETER PasswordBase64
     Base64-encoded password for Create or ResetPassword. Always decoded with
@@ -49,13 +46,7 @@
     as &, %,  and ^ are interpreted by the shell before PowerShell receives
     them. Encode with:
     [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes("YourPassword"))
-    Cannot be combined with -Password or -PasswordBase64.
-
-.PARAMETER PasswordPlain
-    Plaintext password for Create or ResetPassword. Base64 auto-detection is
-    skipped entirely. Use when the password value would otherwise match the
-    Base64 detection heuristics but should be treated as literal text.
-    Cannot be combined with -Password or -PasswordBase64.
+    Cannot be combined with -Password.
 
 .PARAMETER PasswordLength
     Length of the auto-generated random password. Default: 20.
@@ -123,10 +114,6 @@
     .\WLAS.ps1 -Username jdoe -Action Create -PasswordBase64 <base64string>
 
 .EXAMPLE
-    # Create a user with a plaintext password, bypassing Base64 auto-detection
-    .\WLAS.ps1 -Username jdoe -Action Create -PasswordPlain "MyP4ssword=="
-
-.EXAMPLE
     # Create an account with no password
     .\WLAS.ps1 -Username jdoe -Action Create -NoPassword
 
@@ -158,7 +145,7 @@
     Requires local Administrator privileges.
     Designed for use with TacticalRMM and similar RMM platforms.
     Lock screen hide/show changes may require a sign-out or restart to take effect.
-    Version 2.1.2
+    Version 3.0.0
 #>
 
 param (
@@ -171,8 +158,6 @@ param (
     [string]$Password,
 
     [string]$PasswordBase64,
-
-    [string]$PasswordPlain,
 
     [int]$PasswordLength = 20,
 
@@ -199,7 +184,7 @@ $ErrorActionPreference = 'Stop'
 #region -- Constants -----------------------------------------------------------
 
 # Update this value when cutting a new release
-$Script:Version = '2.1.2'
+$Script:Version = '3.0.0'
 
 # Repo URL
 $Script:RepoUrl = 'https://github.com/rimoldetech/WindowsLocalAccountServicer'
@@ -256,27 +241,6 @@ function New-RandomPassword {
 
 function ConvertTo-SecureStringLocal ([string]$Plaintext) {
     return (ConvertTo-SecureString -String $Plaintext -AsPlainText -Force)
-}
-
-function Resolve-Password ([string]$Value) {
-    # Auto-detect Base64-encoded passwords passed via -Password.
-    # All four conditions must hold before decoding is attempted:
-    #   1. Only valid Base64 characters (A-Z, a-z, 0-9, +, /)
-    #   2. Optional 1 or 2 '=' padding characters at the end
-    #   3. Total length is a multiple of 4
-    #   4. Decoded bytes form printable ASCII (the primary false-positive filter)
-    # If any condition fails the original string is returned unchanged.
-    if ($Value.Length % 4 -eq 0 -and $Value -match '^[A-Za-z0-9+/]+=?=?$') {
-        try {
-            $decoded = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Value))
-            if ($decoded -match '^[\x20-\x7E]+$') {
-                Write-Info "Password detected as Base64 -- decoded automatically."
-                return $decoded
-            }
-        }
-        catch { <# Decoding failed; treat as plaintext #> }
-    }
-    return $Value
 }
 
 function Get-LocalUserSafe ([string]$Name) {
@@ -367,8 +331,9 @@ function Invoke-CreateUser {
                       -PasswordNeverExpires | Out-Null
     }
     if ($MakeAdmin) {
-        Add-LocalGroupMember -SID $AdminSID -Member $Name
-        Write-Ok "Created user '$Name' and added to Administrators."
+        Add-LocalGroupMember -SID $UsersSID  -Member $Name
+        Add-LocalGroupMember -SID $AdminSID  -Member $Name
+        Write-Ok "Created user '$Name' and added to Users and Administrators."
     }
     else {
         Add-LocalGroupMember -SID $UsersSID -Member $Name
@@ -897,9 +862,8 @@ function Show-Help {
     Write-Host '    Show            Show on Windows lock screen'
     Write-Host ''
     Write-Host '  OPTIONS' -ForegroundColor Yellow
-    Write-Host '    -Password <str>         Password (auto-detects Base64)'
+    Write-Host '    -Password <str>         Plaintext password'
     Write-Host '    -PasswordBase64 <str>   Always decoded as Base64'
-    Write-Host '    -PasswordPlain <str>    Always treated as plaintext'
     Write-Host '    -PasswordLength <int>   Random password length  [default: 20]'
     Write-Host '    -FullName <str>         Full name  (Create, SetInfo)'
     Write-Host '    -Description <str>      Description  (Create, SetInfo)'
@@ -940,14 +904,12 @@ if (-not $Action) {
 
 Write-Info "WLAS v$($Script:Version)"
 
-# Decode base64 password if provided — use this in RMM contexts where special
-# characters in -Password are interpreted by the shell before PowerShell sees them
 # Validate that only one password input method is provided
-$pwInputCount = @($Password, $PasswordBase64, $PasswordPlain) |
+$pwInputCount = @($Password, $PasswordBase64) |
     Where-Object { -not [string]::IsNullOrEmpty($_) } |
     Measure-Object | Select-Object -ExpandProperty Count
 if ($pwInputCount -gt 1) {
-    Write-Fail "Only one of -Password, -PasswordBase64, or -PasswordPlain may be specified."
+    Write-Fail "Only one of -Password or -PasswordBase64 may be specified."
     exit 1
 }
 
@@ -961,15 +923,7 @@ if (-not [string]::IsNullOrEmpty($PasswordBase64)) {
         exit 1
     }
 }
-elseif (-not [string]::IsNullOrEmpty($PasswordPlain)) {
-    # Explicit plaintext -- use as-is, skip auto-detection entirely
-    $Password = $PasswordPlain
-    Write-Info "Using -PasswordPlain -- Base64 auto-detection skipped."
-}
-elseif (-not [string]::IsNullOrEmpty($Password)) {
-    # Auto-detect -- decode if it looks like Base64, otherwise use as-is
-    $Password = Resolve-Password -Value $Password
-}
+# -Password is always treated as plaintext -- no auto-detection
 
 # Non-interactive: ensure a username is present for every action that needs one
 $actionsNeedingUser = $Action | Where-Object { $_ -ne 'List' }
