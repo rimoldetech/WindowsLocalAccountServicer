@@ -142,6 +142,14 @@
     # Delete an account and remove its profile folder
     .\WLAS.ps1 -Username olduser -Action Delete -DeleteProfile
 
+.PARAMETER Help
+    Displays a brief summary of all actions and options. Also triggered by -h
+    and --help. Use /? for full comment-based help via PowerShell's Get-Help.
+
+.EXAMPLE
+    # Show brief help
+    .\WLAS.ps1 -h
+
 .EXAMPLE
     # Delete an account (profile folder kept)
     .\WLAS.ps1 -Username olduser -Action Delete
@@ -150,7 +158,7 @@
     Requires local Administrator privileges.
     Designed for use with TacticalRMM and similar RMM platforms.
     Lock screen hide/show changes may require a sign-out or restart to take effect.
-    Version 2.0.1
+    Version 2.1.0
 #>
 
 param (
@@ -180,7 +188,10 @@ param (
 
     [switch]$ClearDescription,
 
-    [switch]$DeleteProfile
+    [switch]$DeleteProfile,
+
+    [Alias('h')]
+    [switch]$Help
 )
 
 $ErrorActionPreference = 'Stop'
@@ -188,7 +199,7 @@ $ErrorActionPreference = 'Stop'
 #region -- Constants -----------------------------------------------------------
 
 # Update this value when cutting a new release
-$Script:Version = '2.0.1'
+$Script:Version = '2.1.0'
 
 # Repo URL
 $Script:RepoUrl = 'https://github.com/rimoldetech/WindowsLocalAccountServicer'
@@ -859,7 +870,56 @@ function Invoke-TUI {
 
 #endregion
 
+#region -- Help ----------------------------------------------------------------
+
+function Show-Help {
+    Write-Host ''
+    Write-Host "  Windows Local Account Servicer (WLAS) v$($Script:Version)" -ForegroundColor Cyan
+    Write-Host "  $($Script:RepoUrl)" -ForegroundColor DarkGray
+    Write-Host ''
+    Write-Host '  USAGE' -ForegroundColor Yellow
+    Write-Host '    .\WLAS.ps1                                    Launch interactive TUI'
+    Write-Host '    .\WLAS.ps1 -Username <user> -Action <action> [options]'
+    Write-Host '    .\WLAS.ps1 -Username <user>                   Show account information'
+    Write-Host '    .\WLAS.ps1 -h | --help                        Show this help'
+    Write-Host '    .\WLAS.ps1 /?                                 Full help via Get-Help'
+    Write-Host ''
+    Write-Host '  ACTIONS' -ForegroundColor Yellow
+    Write-Host '    List            List all local accounts'
+    Write-Host '    Create          Create a new account'
+    Write-Host '    Delete          Delete an account  [-DeleteProfile]'
+    Write-Host '    Enable          Enable an account'
+    Write-Host '    Disable         Disable an account'
+    Write-Host '    ResetPassword   Reset or remove a password'
+    Write-Host '    SetInfo         Update full name or description'
+    Write-Host '    Promote         Add to Administrators group'
+    Write-Host '    Demote          Remove from Administrators group'
+    Write-Host '    Hide            Hide from Windows lock screen'
+    Write-Host '    Show            Show on Windows lock screen'
+    Write-Host ''
+    Write-Host '  OPTIONS' -ForegroundColor Yellow
+    Write-Host '    -Password <str>         Password (auto-detects Base64)'
+    Write-Host '    -PasswordBase64 <str>   Always decoded as Base64'
+    Write-Host '    -PasswordPlain <str>    Always treated as plaintext'
+    Write-Host '    -PasswordLength <int>   Random password length  [default: 20]'
+    Write-Host '    -FullName <str>         Full name  (Create, SetInfo)'
+    Write-Host '    -Description <str>      Description  (Create, SetInfo)'
+    Write-Host '    -Admin                  Create as Administrator'
+    Write-Host '    -NoPassword             Create or reset with no password'
+    Write-Host '    -ClearFullName          Clear full name field  (SetInfo)'
+    Write-Host '    -ClearDescription       Clear description field  (SetInfo)'
+    Write-Host '    -DeleteProfile          Delete profile folder  (Delete)'
+    Write-Host ''
+}
+
+#endregion
+
 #region -- Entry Point ---------------------------------------------------------
+
+if ($Help -or $args -contains 'help' -or $args -contains '--help') {
+    Show-Help
+    exit 0
+}
 
 if (-not $Action) {
     if (-not [string]::IsNullOrEmpty($Username)) {
