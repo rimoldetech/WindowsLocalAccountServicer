@@ -52,12 +52,12 @@ Run WLAS with no arguments to launch the menu interface.
 
 ```powershell
 .\WLAS.ps1 -h
+.\WLAS.ps1 -help
 .\WLAS.ps1 --help
 .\WLAS.ps1 /?
 ```
 
-- `-h` and `--help` display a brief inline summary of all actions and options
-- `/?` invokes PowerShell's native `Get-Help` for full parameter documentation
+- `-h`, `-help`, `--help`, and `/?` display a brief inline summary of all actions and options.
 ---
 
 ## Parameters
