@@ -1,4 +1,5 @@
 #Requires -RunAsAdministrator
+#Requires -Modules Microsoft.PowerShell.LocalAccounts
 
 # Windows Local Account Servicer (WLAS)
 # Copyright (c) 2026 Rimolde Technology Services (RTS)
@@ -145,7 +146,7 @@
     Requires local Administrator privileges.
     Designed for use with TacticalRMM and similar RMM platforms.
     Lock screen hide/show changes may require a sign-out or restart to take effect.
-    Version 3.0.1
+    Version 3.0.2
 #>
 
 param (
@@ -184,7 +185,7 @@ $ErrorActionPreference = 'Stop'
 #region -- Constants -----------------------------------------------------------
 
 # Update this value when cutting a new release
-$Script:Version = '3.0.1'
+$Script:Version = '3.0.2'
 
 # Repo URL
 $Script:RepoUrl = 'https://github.com/rimoldetech/WindowsLocalAccountServicer'
@@ -210,7 +211,7 @@ function New-RandomPassword {
     $special = '!@#$%^&*()-_=+'
     $all     = $lower + $upper + $digits + $special
 
-    $rng   = [System.Security.Cryptography.RNGCryptoServiceProvider]::new()
+    $rng   = [System.Security.Cryptography.RandomNumberGenerator]::Create()
     $bytes = [byte[]]::new($Length + 4)
     $rng.GetBytes($bytes)
     $rng.Dispose()
@@ -225,7 +226,7 @@ function New-RandomPassword {
     }
 
     # Fisher-Yates shuffle so the guaranteed chars are not always at the front
-    $rng2 = [System.Security.Cryptography.RNGCryptoServiceProvider]::new()
+    $rng2 = [System.Security.Cryptography.RandomNumberGenerator]::Create()
     $sb   = [byte[]]::new($chars.Count)
     $rng2.GetBytes($sb)
     $rng2.Dispose()
@@ -260,7 +261,10 @@ function Assert-UserNotExists ([string]$Name) {
 function Test-IsInGroup ([string]$Name, [string]$GroupSID) {
     try {
         $members = Get-LocalGroupMember -SID $GroupSID -ErrorAction Stop
-        return [bool]($members | Where-Object { $_.Name -like "*\$Name" -or $_.Name -eq $Name })
+        $escapedName = [Regex]::Escape($Name)
+        return [bool]($members | Where-Object {
+            $_.PrincipalSource -eq 'Local' -and $_.Name -match "\\$escapedName$"
+        })
     }
     catch {
         return $false
