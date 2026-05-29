@@ -50,7 +50,8 @@
     Cannot be combined with -Password.
 
 .PARAMETER PasswordLength
-    Length of the auto-generated random password. Default: 20.
+    Length of the auto-generated random password. Default: 20. Maximum: 127
+    (Windows local account password limit).
 
 .PARAMETER FullName
     Display/full name for the user account. Used with Create and SetInfo.
@@ -146,7 +147,7 @@
     Requires local Administrator privileges.
     Designed for use with TacticalRMM and similar RMM platforms.
     Lock screen hide/show changes may require a sign-out or restart to take effect.
-    Version 3.0.2
+    Version 3.0.3
 #>
 
 param (
@@ -160,6 +161,7 @@ param (
 
     [string]$PasswordBase64,
 
+    [ValidateRange(1, 127)]
     [int]$PasswordLength = 20,
 
     [string]$FullName = '',
@@ -185,7 +187,7 @@ $ErrorActionPreference = 'Stop'
 #region -- Constants -----------------------------------------------------------
 
 # Update this value when cutting a new release
-$Script:Version = '3.0.2'
+$Script:Version = '3.0.3'
 
 # Repo URL
 $Script:RepoUrl = 'https://github.com/rimoldetech/WindowsLocalAccountServicer'
