@@ -145,7 +145,7 @@
     Requires local Administrator privileges.
     Designed for use with TacticalRMM and similar RMM platforms.
     Lock screen hide/show changes may require a sign-out or restart to take effect.
-    Version 3.0.0
+    Version 3.0.1
 #>
 
 param (
@@ -184,7 +184,7 @@ $ErrorActionPreference = 'Stop'
 #region -- Constants -----------------------------------------------------------
 
 # Update this value when cutting a new release
-$Script:Version = '3.0.0'
+$Script:Version = '3.0.1'
 
 # Repo URL
 $Script:RepoUrl = 'https://github.com/rimoldetech/WindowsLocalAccountServicer'
@@ -924,6 +924,13 @@ if (-not [string]::IsNullOrEmpty($PasswordBase64)) {
     }
 }
 # -Password is always treated as plaintext -- no auto-detection
+
+# Windows local accounts cap passwords at 127 characters (NTLM limit).
+# Set-LocalUser accepts longer values silently but authentication will fail.
+if (-not [string]::IsNullOrEmpty($Password) -and $Password.Length -gt 127) {
+    Write-Fail "Password is $($Password.Length) characters. Windows local account passwords must be 127 characters or fewer."
+    exit 1
+}
 
 # Non-interactive: ensure a username is present for every action that needs one
 $actionsNeedingUser = $Action | Where-Object { $_ -ne 'List' }
