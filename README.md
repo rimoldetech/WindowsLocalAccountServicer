@@ -164,8 +164,7 @@ When multiple actions are specified, they always execute in this order regardles
 **Create a user with a password containing special characters (Base64-encoded)**
 ```powershell
 # Generate the encoded value first in any PowerShell session:
-$pw = 'P@ssw&rd!'
-[Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($pw))
+[Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes('P@ssw0rd!'))
 # Then pass the output to the script:
 .\WLAS.ps1 -Username jdoe -Action Create -PasswordBase64 <base64string>
 ```
