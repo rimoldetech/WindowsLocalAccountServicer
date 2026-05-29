@@ -215,7 +215,7 @@ This script is designed to work cleanly within TacticalRMM:
 
 Windows local account passwords are capped at **127 characters** by the NTLM authentication protocol. `Set-LocalUser` accepts longer passwords without error, but Windows will silently reject them at login.
 
-WLAS enforces this limit at runtime and will exit with an error if a supplied password exceeds 127 characters. The built-in random password generator is not affected.
+WLAS enforces this limit at runtime and will exit with an error if a supplied password exceeds 127 characters. This includes the built-in random password generator.
 
 ---
 
