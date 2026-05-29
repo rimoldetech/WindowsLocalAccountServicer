@@ -147,7 +147,7 @@
     Requires local Administrator privileges.
     Designed for use with TacticalRMM and similar RMM platforms.
     Lock screen hide/show changes may require a sign-out or restart to take effect.
-    Version 3.0.3
+    Version 3.0.4
 #>
 
 param (
@@ -161,7 +161,6 @@ param (
 
     [string]$PasswordBase64,
 
-    [ValidateRange(1, 127)]
     [int]$PasswordLength = 20,
 
     [string]$FullName = '',
@@ -187,7 +186,7 @@ $ErrorActionPreference = 'Stop'
 #region -- Constants -----------------------------------------------------------
 
 # Update this value when cutting a new release
-$Script:Version = '3.0.3'
+$Script:Version = '3.0.4'
 
 # Repo URL
 $Script:RepoUrl = 'https://github.com/rimoldetech/WindowsLocalAccountServicer'
@@ -621,8 +620,27 @@ function Read-TuiPassword ([string]$Context = 'Password') {
     Write-Host "  $Context`:  [1] Generate random   [2] Enter manually   [3] No password"
     $c = Read-TuiChoice -Prompt 'Choice' -Valid @('1', '2', '3')
     switch ($c) {
-        '1' { return New-RandomPassword -Length 20 }
-        '2' { return Read-TuiNonEmpty -Prompt 'Password' }
+        '1' {
+            $lenInput = (Read-Host '  Length (Enter for default 20)').Trim()
+            if ([string]::IsNullOrEmpty($lenInput)) {
+                $len = 20
+            }
+            elseif ($lenInput -match '^\d+$' -and [int]$lenInput -ge 1 -and [int]$lenInput -le 127) {
+                $len = [int]$lenInput
+            }
+            else {
+                Write-Host '  Invalid length. Must be a number between 1 and 127. Using default of 20.' -ForegroundColor Yellow
+                $len = 20
+            }
+            return New-RandomPassword -Length $len
+        }
+        '2' {
+            while ($true) {
+                $pw = Read-TuiNonEmpty -Prompt 'Password'
+                if ($pw.Length -le 127) { return $pw }
+                Write-Host "  Password is $($pw.Length) characters. Maximum is 127. Please try again." -ForegroundColor Yellow
+            }
+        }
         '3' { return $null }
     }
 }
