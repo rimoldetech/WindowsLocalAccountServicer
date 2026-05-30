@@ -1,7 +1,7 @@
 #Requires -RunAsAdministrator
 #Requires -Modules Microsoft.PowerShell.LocalAccounts
 
-# Windows Local Account Servicer (WLAS)
+# Windows Local Account Servicer (WLAS) - Version 3.0.4
 # Copyright (c) 2026 Rimolde Technology Services (RTS)
 # Licensed under the MIT License - https://opensource.org/licenses/MIT
 # https://github.com/rimoldetech/WindowsLocalAccountServicer
@@ -147,7 +147,6 @@
     Requires local Administrator privileges.
     Designed for use with TacticalRMM and similar RMM platforms.
     Lock screen hide/show changes may require a sign-out or restart to take effect.
-    Version 3.0.4
 #>
 
 param (
