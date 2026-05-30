@@ -161,6 +161,7 @@ param (
 
     [string]$PasswordBase64,
 
+    [ValidateRange(1, 127)]
     [int]$PasswordLength = 20,
 
     [string]$FullName = '',
