@@ -367,7 +367,12 @@ function Invoke-DeleteUser {
             }
             $profilePath = $profile.LocalPath
             $profile | Remove-CimInstance
-            Write-Ok "User profile deleted: $profilePath"
+            if (Test-Path -LiteralPath $profilePath) {
+                Write-Warn "Profile deregistered from Windows but the folder at '$profilePath' still exists and could not be removed automatically. You may need to delete it manually."
+            }
+            else {
+                Write-Ok "User profile deleted: $profilePath"
+            }
         }
         else {
             Write-Warn "No profile found for '$Name' -- the account may never have been signed into."
