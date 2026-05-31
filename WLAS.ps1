@@ -1,7 +1,7 @@
 #Requires -RunAsAdministrator
 #Requires -Modules Microsoft.PowerShell.LocalAccounts
 
-# Windows Local Account Servicer (WLAS) - Version 3.0.4
+# Windows Local Account Servicer (WLAS) - Version 3.1.0
 # Copyright (c) 2026 Rimolde Technology Services (RTS)
 # Licensed under the MIT License - https://opensource.org/licenses/MIT
 # https://github.com/rimoldetech/WindowsLocalAccountServicer
