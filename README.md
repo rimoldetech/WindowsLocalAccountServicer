@@ -85,13 +85,13 @@ Run WLAS with no arguments to launch the menu interface.
 |---|---|
 | `List` | List all local accounts with Enabled, Admin, Hidden, and description status. |
 | `Create` | Create a new local user account. |
-| `Delete` | Delete an account. Also removes any associated lock screen registry entry. Use `-DeleteProfile` to also remove the user's profile folder. |
+| `Delete` | Delete an account. Also removes any associated lock screen registry entry. Use `-DeleteProfile` to also remove the user's profile folder. Cannot be used against built-in accounts. |
 | `Enable` | Enable a disabled account. |
-| `Disable` | Disable an account. |
+| `Disable` | Disable an account. Cannot be used against built-in accounts. |
 | `ResetPassword` | Reset the account password. Generates a random password if `-Password` is not provided. Use `-NoPassword` to remove the password entirely. |
 | `SetInfo` | Update the full name and/or description of an existing account. Use `-ClearFullName` or `-ClearDescription` to blank those fields. |
 | `Promote` | Add the account to the Administrators group. |
-| `Demote` | Remove the account from the Administrators group. Ensures the account remains in the Users group. |
+| `Demote` | Remove the account from the Administrators group. Ensures the account remains in the Users group. Cannot be used against built-in accounts. |
 | `Hide` | Hide the account from the Windows lock screen. A sign-out or restart may be required. |
 | `Show` | Show the account on the Windows lock screen. A sign-out or restart may be required. |
 
@@ -206,7 +206,8 @@ This script is designed to work cleanly within TacticalRMM:
 - `-DeleteProfile` uses `Win32_UserProfile` to remove the user's profile folder and registry hive the way Windows intends — the same mechanism behind the Delete button in System Properties → User Profiles. The user must be fully signed out; if the profile is loaded the operation will fail cleanly without deleting the account. There is at least one edge case where the user is removed from the registry hive properly but their profile folder remains on disk; In this case, the script will warn of this outcome. Accounts that were never signed into have no registered profile and this is handled gracefully.
 - Passing `-Username` without `-Action` displays a summary of that account rather than launching the TUI, making it safe to use in RMM contexts
 - All accounts are created with **Password Never Expires** enabled. This applies to both password and no-password accounts. As Windows enforces mutual exclusivity between this and the must-change-password flag, the latter is always effectively off
-- The random password generator uses `RNGCryptoServiceProvider` and guarantees at least one lowercase letter, uppercase letter, digit, and special character in every generated password
+- The random password generator uses `RandomNumberGenerator` (compatible with both PowerShell 5.1 and 7+) and guarantees at least one lowercase letter, uppercase letter, digit, and special character in every generated password
+- `Delete`, `Disable`, and `Demote` are blocked against Windows built-in accounts (Administrator, Guest, DefaultAccount) regardless of whether they have been renamed. Detection is SID-based. This is a safety net against accidental lockout, particularly in RMM deployments
 - `-Password` is always treated as plaintext. Use `-PasswordBase64` when the password contains special characters that would be interpreted by the shell. Only one of the two may be specified per invocation
 
 ---
