@@ -266,8 +266,9 @@ function Assert-NotBuiltIn ([string]$Name, [string]$ActionName) {
     #   -500: Built-in Administrator
     #   -501: Built-in Guest
     #   -503: DefaultAccount
+	#   -504: WDAGUtilityAccount (Windows Defender Application Guard / Sandbox)
     $user = Get-LocalUserSafe -Name $Name
-    if ($user -and $user.SID.Value -match '-(500|501|503)$') {
+    if ($user -and $user.SID.Value -match '-(500|501|503|504)$') {
         throw "Safety restriction: '$ActionName' cannot be performed on built-in account '$Name'. This guard exists to prevent accidental system lockout."
     }
 }
