@@ -150,6 +150,7 @@
 #>
 
 param (
+    [ValidateNotNullOrEmpty()]
     [string]$Username,
 
     [ValidateSet('List', 'Create', 'Delete', 'Enable', 'Disable',
@@ -186,7 +187,7 @@ $ErrorActionPreference = 'Stop'
 #region -- Constants -----------------------------------------------------------
 
 # Update this value when cutting a new release
-$Script:Version = '3.0.4'
+$Script:Version = '3.1.0'
 
 # Repo URL
 $Script:RepoUrl = 'https://github.com/rimoldetech/WindowsLocalAccountServicer'
@@ -257,6 +258,18 @@ function Assert-UserExists ([string]$Name) {
 
 function Assert-UserNotExists ([string]$Name) {
     if (Get-LocalUserSafe -Name $Name) { throw "User '$Name' already exists." }
+}
+
+function Assert-NotBuiltIn ([string]$Name, [string]$ActionName) {
+    # Guard against destructive or lockout-risk actions on built-in accounts.
+    # Checks by SID suffix to be resilient against renamed built-in accounts.
+    #   -500: Built-in Administrator
+    #   -501: Built-in Guest
+    #   -503: DefaultAccount
+    $user = Get-LocalUserSafe -Name $Name
+    if ($user -and $user.SID.Value -match '-(500|501|503)$') {
+        throw "Safety restriction: '$ActionName' cannot be performed on built-in account '$Name'. This guard exists to prevent accidental system lockout."
+    }
 }
 
 function Test-IsInGroup ([string]$Name, [string]$GroupSID) {
@@ -354,6 +367,7 @@ function Invoke-DeleteUser {
         [bool]$DeleteProfile
     )
     $user = Assert-UserExists -Name $Name
+    Assert-NotBuiltIn -Name $Name -ActionName 'Delete'
 
     if ($DeleteProfile) {
         $sid     = $user.SID.Value
@@ -398,6 +412,7 @@ function Invoke-EnableUser ([string]$Name) {
 
 function Invoke-DisableUser ([string]$Name) {
     Assert-UserExists -Name $Name | Out-Null
+    Assert-NotBuiltIn -Name $Name -ActionName 'Disable'
     Disable-LocalUser -Name $Name
     Write-Ok "Disabled account '$Name'."
 }
@@ -470,6 +485,7 @@ function Invoke-PromoteUser ([string]$Name) {
 
 function Invoke-DemoteUser ([string]$Name) {
     Assert-UserExists -Name $Name | Out-Null
+    Assert-NotBuiltIn -Name $Name -ActionName 'Demote'
     if (-not (Test-IsAdmin -Name $Name)) {
         Write-Warn "User '$Name' is not in the Administrators group."
         return
@@ -712,7 +728,7 @@ function Invoke-TuiCreateUser {
                           -UserFullName $fullName `
                           -UserDescription $desc `
                           -MakeAdmin $makeAdmin `
-                          -NoPassword $noPw
+                          -NoPassword $noPw | Out-Null
         Write-Host ''
         Write-Host "  [OK] Created : $name" -ForegroundColor Green
         Write-Host "       Password: $(if ($noPw) {'(none)'} else {$pw})" -ForegroundColor Green
@@ -775,22 +791,22 @@ function Invoke-TuiManageUser {
                 '1' {
                     $pw   = Read-TuiPassword -Context 'New Password'
                     $noPw = ($null -eq $pw)
-                    Invoke-ResetPassword -Name $name -PlainPassword $(if ($noPw) {''} else {$pw}) -NoPassword $noPw
+                    Invoke-ResetPassword -Name $name -PlainPassword $(if ($noPw) {''} else {$pw}) -NoPassword $noPw | Out-Null
                     if ($noPw) { Write-Host '  Password removed.' -ForegroundColor Green }
                     else       { Write-Host "  New password: $pw" -ForegroundColor Green }
                 }
-                '2' { Invoke-EnableUser  -Name $name; Invoke-TuiResult 'Account enabled.' }
-                '3' { Invoke-DisableUser -Name $name; Invoke-TuiResult 'Account disabled.' }
-                '4' { Invoke-PromoteUser -Name $name; Invoke-TuiResult 'Promoted to Administrator.' }
-                '5' { Invoke-DemoteUser  -Name $name; Invoke-TuiResult 'Demoted from Administrator.' }
-                '6' { Invoke-HideUser    -Name $name; Invoke-TuiResult 'Hidden. A sign-out or restart may be required.' }
-                '7' { Invoke-ShowUser    -Name $name; Invoke-TuiResult 'Shown. A sign-out or restart may be required.' }
+                '2' { Invoke-EnableUser  -Name $name | Out-Null; Invoke-TuiResult 'Account enabled.' }
+                '3' { Invoke-DisableUser -Name $name | Out-Null; Invoke-TuiResult 'Account disabled.' }
+                '4' { Invoke-PromoteUser -Name $name | Out-Null; Invoke-TuiResult 'Promoted to Administrator.' }
+                '5' { Invoke-DemoteUser  -Name $name | Out-Null; Invoke-TuiResult 'Demoted from Administrator.' }
+                '6' { Invoke-HideUser    -Name $name | Out-Null; Invoke-TuiResult 'Hidden. A sign-out or restart may be required.' }
+                '7' { Invoke-ShowUser    -Name $name | Out-Null; Invoke-TuiResult 'Shown. A sign-out or restart may be required.' }
                 '8' {
                     $confirm = (Read-Host "  Type 'yes' to confirm deletion of '$name'").Trim()
                     if ($confirm -eq 'yes') {
                         Write-Host '  Also delete user profile folder?  [1] Yes   [2] No'
                         $delProfile = (Read-TuiChoice -Prompt 'Choice' -Valid @('1','2')) -eq '1'
-                        Invoke-DeleteUser -Name $name -DeleteProfile $delProfile
+                        Invoke-DeleteUser -Name $name -DeleteProfile $delProfile | Out-Null
                         Invoke-TuiResult "Account '$name' deleted."
                         Invoke-TuiPause
                         return
