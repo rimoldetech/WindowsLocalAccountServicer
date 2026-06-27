@@ -1,7 +1,7 @@
 #Requires -RunAsAdministrator
 #Requires -Modules Microsoft.PowerShell.LocalAccounts
 
-# Windows Local Account Servicer (WLAS) - Version 3.1.0
+# Windows Local Account Servicer (WLAS) - Version 3.1.1
 # Copyright (c) 2026 Rimolde Technology Services (RTS)
 # Licensed under the MIT License - https://opensource.org/licenses/MIT
 # https://github.com/rimoldetech/WindowsLocalAccountServicer
@@ -187,7 +187,7 @@ $ErrorActionPreference = 'Stop'
 #region -- Constants -----------------------------------------------------------
 
 # Update this value when cutting a new release
-$Script:Version = '3.1.0'
+$Script:Version = '3.1.1'
 
 # Repo URL
 $Script:RepoUrl = 'https://github.com/rimoldetech/WindowsLocalAccountServicer'
@@ -276,9 +276,18 @@ function Assert-NotBuiltIn ([string]$Name, [string]$ActionName) {
 function Test-IsInGroup ([string]$Name, [string]$GroupSID) {
     try {
         $members = Get-LocalGroupMember -SID $GroupSID -ErrorAction Stop
-        $escapedName = [Regex]::Escape($Name)
+        # Anchor the match to this machine's computer name rather than relying on
+        # PrincipalSource, which is unreliable in the LocalAccounts module --
+        # it can return $null or an unexpected value for accounts that were added
+        # to the group via tools other than Add-LocalGroupMember (Computer
+        # Management, net localgroup, the Settings app, etc.), causing false
+        # negatives. A domain account sharing this username would have a
+        # "DOMAIN\Name" prefix rather than "COMPUTERNAME\Name", so this still
+        # protects against that original false-positive concern.
+        $escapedName     = [Regex]::Escape($Name)
+        $escapedComputer = [Regex]::Escape($env:COMPUTERNAME)
         return [bool]($members | Where-Object {
-            $_.PrincipalSource -eq 'Local' -and $_.Name -match "\\$escapedName$"
+            $_.Name -match "^$escapedComputer\\$escapedName$"
         })
     }
     catch {
