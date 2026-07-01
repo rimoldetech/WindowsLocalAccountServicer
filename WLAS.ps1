@@ -778,9 +778,12 @@ function Invoke-TuiManageUser {
             if ($prop -and $prop.$name -eq 0) { $isHidden = $true }
         }
 
-        Write-Host "  Enabled : $(if ($isEnabled) {'Yes'} else {'No'})"
-        Write-Host "  Admin   : $(if ($isAdmin)   {'Yes'} else {'No'})"
-        Write-Host "  Hidden  : $(if ($isHidden)  {'Yes (sign-out or restart may be required)'} else {'No'})"
+        Write-Host "  Enabled     : $(if ($isEnabled) {'Yes'} else {'No'})"
+        Write-Host "  Admin       : $(if ($isAdmin)   {'Yes'} else {'No'})"
+        Write-Host "  Hidden      : $(if ($isHidden)  {'Yes (sign-out or restart may be required)'} else {'No'})"
+        Write-Host "  Full Name   : $(if ($user.FullName)    {$user.FullName}    else {'(none)'})"
+        Write-Host "  Description : $(if ($user.Description) {$user.Description} else {'(none)'})"
+        Write-Host "  SID         : $($user.SID.Value)"
         Write-Host ''
         Write-Host '    [1] Reset Password'
         Write-Host '    [2] Enable Account'
