@@ -1,7 +1,7 @@
 #Requires -RunAsAdministrator
 #Requires -Modules Microsoft.PowerShell.LocalAccounts
 
-# Windows Local Account Servicer (WLAS) - Version 3.1.1
+# Windows Local Account Servicer (WLAS) - Version 3.2.0
 # Copyright (c) 2026 Rimolde Technology Services (RTS)
 # Licensed under the MIT License - https://opensource.org/licenses/MIT
 # https://github.com/rimoldetech/WindowsLocalAccountServicer
@@ -187,7 +187,7 @@ $ErrorActionPreference = 'Stop'
 #region -- Constants -----------------------------------------------------------
 
 # Update this value when cutting a new release
-$Script:Version = '3.1.1'
+$Script:Version = '3.2.0'
 
 # Repo URL
 $Script:RepoUrl = 'https://github.com/rimoldetech/WindowsLocalAccountServicer'
@@ -550,6 +550,7 @@ function Show-UserInfo ([string]$Name) {
     Write-Output "  Hidden      : $(if ($isHidden)     {'Yes'} else {'No'})"
     Write-Output "  Full Name   : $(if ($user.FullName)    {$user.FullName}    else {'(none)'})"
     Write-Output "  Description : $(if ($user.Description) {$user.Description} else {'(none)'})"
+    Write-Output "  SID         : $($user.SID.Value)"
 }
 
 function Invoke-Actions {
