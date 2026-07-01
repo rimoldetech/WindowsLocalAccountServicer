@@ -207,8 +207,10 @@ This script is designed to work cleanly within TacticalRMM:
 - Passing `-Username` without `-Action` displays a summary of that account rather than launching the TUI, making it safe to use in RMM contexts
 - All accounts are created with **Password Never Expires** enabled. This applies to both password and no-password accounts. As Windows enforces mutual exclusivity between this and the must-change-password flag, the latter is always effectively off
 - The random password generator uses `RandomNumberGenerator` (compatible with both PowerShell 5.1 and 7+) and guarantees at least one lowercase letter, uppercase letter, digit, and special character in every generated password
-- `Delete`, `Disable`, and `Demote` are blocked against Windows built-in accounts (Administrator, Guest, DefaultAccount, WDAGUtilityAccount) regardless of whether they have been renamed. Detection is SID-based. This is a safety net against accidental lockout, particularly in RMM deployments
 - `-Password` is always treated as plaintext. Use `-PasswordBase64` when the password contains special characters that would be interpreted by the shell. Only one of the two may be specified per invocation
+- `Delete`, `Disable`, and `Demote` are blocked against Windows built-in accounts (Administrator, Guest, DefaultAccount, WDAGUtilityAccount) regardless of whether they have been renamed. Detection is SID-based. This is a safety net against accidental lockout, particularly in RMM deployments
+
+**Warning for Microsoft Entra environments:** Windows 11 machines enrolled in Entra (and occasionally others) may have a `WsiAccount` system account used for Web Sign-in scenarios. This account does not have a consistent SID across installations so it is not covered by the built-in account guard. Exercise caution before performing destructive actions against it.
 
 ---
 
